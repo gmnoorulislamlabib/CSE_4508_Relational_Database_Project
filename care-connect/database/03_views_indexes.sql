@@ -83,3 +83,5 @@ SELECT
     is_available
 FROM rooms
 WHERE is_available = TRUE;
+
+

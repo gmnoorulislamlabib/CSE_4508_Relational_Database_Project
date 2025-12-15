@@ -26,18 +26,16 @@ WHERE d.consultation_fee > (SELECT AVG(consultation_fee) FROM doctors)`
     {
         id: 2,
         title: "Revenue by Department",
-        description: "Rollup aggregation of revenue by department and doctor",
+        description: "Rollup aggregation of revenue by department (Grand Total included)",
         sql: `SELECT 
-    dept.name AS department,
-    CONCAT(p.first_name, ' ', p.last_name) AS doctor_name,
+    COALESCE(dept.name, 'GRAND TOTAL') AS department,
     SUM(i.net_amount) AS total_revenue
 FROM invoices i
 JOIN appointments a ON i.appointment_id = a.appointment_id
 JOIN doctors d ON a.doctor_id = d.doctor_id
 JOIN departments dept ON d.dept_id = dept.dept_id
-JOIN profiles p ON d.user_id = p.user_id
 WHERE i.status = 'Paid'
-GROUP BY dept.name, p.user_id WITH ROLLUP`
+GROUP BY dept.name WITH ROLLUP`
     },
     {
         id: 3,
@@ -62,7 +60,8 @@ GROUP BY pat.patient_id, p.first_name, p.last_name`
     }
 ];
 
-export default async function ReportsPage({ searchParams }: { searchParams: { q?: string } }) {
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+    const params = await searchParams;
     const cookieStore = await cookies();
     const session = cookieStore.get('session');
     let role = null;
@@ -77,7 +76,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: { q?
         redirect('/dashboard');
     }
 
-    const activeReport = REPORTS.find(r => r.id.toString() === searchParams?.q);
+    const activeReport = REPORTS.find(r => r.id.toString() === params.q);
     let results: any[] = [];
     let error = null;
 

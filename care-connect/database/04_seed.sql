@@ -269,3 +269,316 @@ INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES
 INSERT INTO users (email, password_hash, role) VALUES ('reception@careconnect.bd', 'reception123', 'Staff');
 INSERT INTO profiles (user_id, first_name, last_name, phone_number, gender, date_of_birth, address) VALUES
 (10, 'Reception', 'Desk', '01711111111', 'Other', '2000-01-01', 'Hospital Front Desk');
+
+-- =========================================================
+-- EXTENDED SEED DATA FOR TESTING (APPENDED)
+-- =========================================================
+
+-- 21. New Doctor: Dr. Ayesha (Gynecology)
+INSERT INTO users (email, password_hash, role) VALUES ('dr.ayesha@careconnect.bd', 'doctor123', 'Doctor'); -- ID 11
+INSERT INTO profiles (user_id, first_name, last_name, phone_number, gender, date_of_birth, address) VALUES
+(11, 'Ayesha', 'Siddiqa', '01711111112', 'Female', '1983-04-12', 'Mirpur DOHS, Dhaka');
+INSERT INTO doctors (user_id, dept_id, specialization, license_number, consultation_fee, joining_date) VALUES
+(11, 7, 'Gynecologist', 'BMDC-A-11111', 1500.00, '2019-01-01');
+INSERT INTO schedules (doctor_id, day_of_week, start_time, end_time, room_number) VALUES
+(5, 'Sunday', '10:00:00', '13:00:00', 'Rm-505'),
+(5, 'Tuesday', '10:00:00', '13:00:00', 'Rm-505');
+
+-- 22. New Doctor: Dr. Kamal (General Medicine)
+INSERT INTO users (email, password_hash, role) VALUES ('dr.kamal@careconnect.bd', 'doctor123', 'Doctor'); -- ID 12
+INSERT INTO profiles (user_id, first_name, last_name, phone_number, gender, date_of_birth, address) VALUES
+(12, 'Kamal', 'Uddin', '01711111113', 'Male', '1978-11-30', 'Bashundhara, Dhaka');
+INSERT INTO doctors (user_id, dept_id, specialization, license_number, consultation_fee, joining_date) VALUES
+(12, 3, 'General Practitioner', 'BMDC-A-22222', 800.00, '2010-05-15');
+INSERT INTO schedules (doctor_id, day_of_week, start_time, end_time, room_number) VALUES
+(6, 'Saturday', '16:00:00', '21:00:00', 'Rm-205'),
+(6, 'Monday', '16:00:00', '21:00:00', 'Rm-205');
+
+-- 23. New Doctor: Dr. Rafiq (Neurology)
+INSERT INTO users (email, password_hash, role) VALUES ('dr.rafiq@careconnect.bd', 'doctor123', 'Doctor'); -- ID 13
+INSERT INTO profiles (user_id, first_name, last_name, phone_number, gender, date_of_birth, address) VALUES
+(13, 'Rafiq', 'Islam', '01711111114', 'Male', '1975-02-20', 'Uttara, Dhaka');
+INSERT INTO doctors (user_id, dept_id, specialization, license_number, consultation_fee, joining_date) VALUES
+(13, 6, 'Neurologist', 'BMDC-A-33333', 2000.00, '2015-08-01');
+INSERT INTO schedules (doctor_id, day_of_week, start_time, end_time, room_number) VALUES
+(7, 'Wednesday', '18:00:00', '21:00:00', 'Rm-301');
+
+-- 24. New Patients
+INSERT INTO users (email, password_hash, role) VALUES 
+('salma.jahan@careconnect.bd', 'patient123', 'Patient'), -- ID 14
+('james.bond@careconnect.bd', 'patient123', 'Patient'), -- ID 15
+('anis.haq@careconnect.bd', 'patient123', 'Patient'); -- ID 16
+
+INSERT INTO profiles (user_id, first_name, last_name, phone_number, gender, date_of_birth, address) VALUES
+(14, 'Salma', 'Jahan', '01999999991', 'Female', '1992-05-10', 'Farmgate, Dhaka'),
+(15, 'James', 'Bond', '01999999992', 'Male', '1980-01-01', 'Baridhara, Dhaka'),
+(16, 'Anisul', 'Haque', '01999999993', 'Male', '1960-12-16', 'Gulshan 2, Dhaka');
+
+INSERT INTO patients (user_id, blood_group, emergency_contact_first_name, emergency_contact_last_name, emergency_contact_phone) VALUES
+(14, 'O+', 'Mother', 'Jahan', '01900000001'),
+(15, 'AB-', 'M', 'Chief', '01900000002'),
+(16, 'B+', 'Wife', 'Haq', '01900000003');
+
+-- =========================================================
+-- HISTORICAL FINANCIAL DATA (For Analytics Testing)
+-- =========================================================
+
+-- Month 1 (4 Months ago): ~5000 revenue
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(100, 1, 1, DATE_SUB(NOW(), INTERVAL 4 MONTH), 'Completed', 'Old Checkup 1');
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(100, 100, 1500.00, 1500.00, 'Paid', DATE_SUB(NOW(), INTERVAL 4 MONTH));
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES 
+(100, 1500.00, 'Cash', DATE_SUB(NOW(), INTERVAL 4 MONTH));
+
+-- Month 2 (3 Months ago): ~8000 revenue
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(101, 2, 2, DATE_SUB(NOW(), INTERVAL 3 MONTH), 'Completed', 'Bone Fracture Followup');
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(101, 101, 2000.00, 2000.00, 'Paid', DATE_SUB(NOW(), INTERVAL 3 MONTH));
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES 
+(101, 2000.00, 'Card', DATE_SUB(NOW(), INTERVAL 3 MONTH));
+
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(102, 3, 5, DATE_SUB(NOW(), INTERVAL 3 MONTH), 'Completed', 'Pregnancy Check'); -- Dr. Ayesha
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(102, 102, 1500.00, 1500.00, 'Paid', DATE_SUB(NOW(), INTERVAL 3 MONTH));
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES 
+(102, 1500.00, 'Cash', DATE_SUB(NOW(), INTERVAL 3 MONTH));
+
+
+-- Month 3 (Last Month): ~12000 revenue
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(103, 4, 6, DATE_SUB(NOW(), INTERVAL 1 MONTH), 'Completed', 'Viral Fever'); -- Dr. Kamal
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(103, 103, 800.00, 800.00, 'Paid', DATE_SUB(NOW(), INTERVAL 1 MONTH));
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES 
+(103, 800.00, 'Cash', DATE_SUB(NOW(), INTERVAL 1 MONTH));
+
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(104, 5, 7, DATE_SUB(NOW(), INTERVAL 28 DAY), 'Completed', 'Migraine'); -- Dr. Rafiq
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(104, 104, 2000.00, 2000.00, 'Paid', DATE_SUB(NOW(), INTERVAL 28 DAY));
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES 
+(104, 2000.00, 'Card', DATE_SUB(NOW(), INTERVAL 28 DAY));
+
+-- Month 4 (Current Month/Week): Mixed
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(105, 1, 1, NOW(), 'Scheduled', 'Follow up');
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(105, 105, 1500.00, 1500.00, 'Paid', NOW());
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES 
+(105, 1500.00, 'Online', NOW());
+
+-- Lab Tests
+INSERT INTO patient_tests (patient_id, test_id, record_id, doctor_id, payment_status, status) VALUES
+(1, 1, 500, 1, 'PAID', 'COMPLETED');
+
+-- Invoice for the test (Manual ID 500)
+INSERT INTO invoices (invoice_id, test_record_id, total_amount, net_amount, status, generated_at) VALUES
+(500, 500, 500.00, 500.00, 'Paid', DATE_SUB(NOW(), INTERVAL 2 DAY));
+
+-- Payment for test
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES
+(500, 500.00, 'Online', DATE_SUB(NOW(), INTERVAL 2 DAY));
+
+
+-- =========================================================
+-- COMPREHENSIVE SEED DATA
+-- Ensures EVERY Doctor has income and EVERY Patient has activity
+-- =========================================================
+
+-- DOCTORS LIST (For Reference):
+-- 1: Cardiologist (Old)
+-- 2: Orthopedic (Old)
+-- 3: Pediatrician (Seed)
+-- 4: Dermatologist (Seed)
+-- 5: Dr. Ayesha (Gyne - New)
+-- 6: Dr. Kamal (Gen Med - New)
+-- 7: Dr. Rafiq (Neuro - New)
+
+-- PATIENTS LIST (For Reference):
+-- 1: Karim
+-- 2: Abdul
+-- 3: Tina
+-- 4: Kamal (Senior)
+-- 5: Salma
+-- 6: James
+-- 7: Anisul
+
+-- Generating IDs starting from 200 to avoid conflicts
+
+-- =========================================================
+-- DOCTOR ACTIVITY (Appointments & Revenue)
+-- =========================================================
+
+-- DOC 1 (Cardio): High Volume
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(200, 1, 1, DATE_SUB(NOW(), INTERVAL 5 MONTH), 'Completed', 'Checkup 1'),
+(201, 2, 1, DATE_SUB(NOW(), INTERVAL 3 MONTH), 'Completed', 'Checkup 2'),
+(202, 5, 1, DATE_SUB(NOW(), INTERVAL 1 MONTH), 'Completed', 'Chest Pain');
+
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(200, 200, 1500.00, 1500.00, 'Paid', DATE_SUB(NOW(), INTERVAL 5 MONTH)),
+(201, 201, 1500.00, 1500.00, 'Paid', DATE_SUB(NOW(), INTERVAL 3 MONTH)),
+(202, 202, 1500.00, 1500.00, 'Paid', DATE_SUB(NOW(), INTERVAL 1 MONTH));
+
+-- DOC 2 (Ortho): High Fee
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(203, 3, 2, DATE_SUB(NOW(), INTERVAL 4 MONTH), 'Completed', 'Leg Pain'),
+(204, 6, 2, DATE_SUB(NOW(), INTERVAL 2 WEEK), 'Completed', 'Sports Injury');
+
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(203, 203, 2000.00, 2000.00, 'Paid', DATE_SUB(NOW(), INTERVAL 4 MONTH)),
+(204, 204, 2000.00, 2000.00, 'Paid', DATE_SUB(NOW(), INTERVAL 2 WEEK));
+
+-- DOC 3 (Pediatrics): Low Fee, High Volume
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(205, 3, 3, DATE_SUB(NOW(), INTERVAL 6 MONTH), 'Completed', 'Vaccine'),
+(206, 3, 3, DATE_SUB(NOW(), INTERVAL 3 MONTH), 'Completed', 'Fever'),
+(207, 7, 3, DATE_SUB(NOW(), INTERVAL 1 WEEK), 'Completed', 'Cold');
+
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(205, 205, 1200.00, 1200.00, 'Paid', DATE_SUB(NOW(), INTERVAL 6 MONTH)),
+(206, 206, 1200.00, 1200.00, 'Paid', DATE_SUB(NOW(), INTERVAL 3 MONTH)),
+(207, 207, 1200.00, 1200.00, 'Paid', DATE_SUB(NOW(), INTERVAL 1 WEEK));
+
+-- DOC 4 (Dermatology): Medium
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(208, 1, 4, DATE_SUB(NOW(), INTERVAL 2 MONTH), 'Completed', 'Rash'),
+(209, 5, 4, DATE_SUB(NOW(), INTERVAL 10 DAY), 'Completed', 'Acne');
+
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(208, 208, 1800.00, 1800.00, 'Paid', DATE_SUB(NOW(), INTERVAL 2 MONTH)),
+(209, 209, 1800.00, 1800.00, 'Paid', DATE_SUB(NOW(), INTERVAL 10 DAY));
+
+-- DOC 5 (Gynecology): Ayesha
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(210, 5, 5, DATE_SUB(NOW(), INTERVAL 4 MONTH), 'Completed', 'Regular Checkup'),
+(211, 5, 5, DATE_SUB(NOW(), INTERVAL 2 MONTH), 'Completed', 'Followup'),
+(212, 3, 5, DATE_SUB(NOW(), INTERVAL 5 DAY), 'Completed', 'Discussion'); -- Tina (Mother)
+
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(210, 210, 1500.00, 1500.00, 'Paid', DATE_SUB(NOW(), INTERVAL 4 MONTH)),
+(211, 211, 1500.00, 1500.00, 'Paid', DATE_SUB(NOW(), INTERVAL 2 MONTH)),
+(212, 212, 1500.00, 1500.00, 'Paid', DATE_SUB(NOW(), INTERVAL 5 DAY));
+
+-- DOC 6 (Gen Med): Kamal (Low fee, Many patients)
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(213, 2, 6, DATE_SUB(NOW(), INTERVAL 5 MONTH), 'Completed', 'Weakness'),
+(214, 4, 6, DATE_SUB(NOW(), INTERVAL 4 MONTH), 'Completed', 'Routine'),
+(215, 6, 6, DATE_SUB(NOW(), INTERVAL 3 MONTH), 'Completed', 'Headache'),
+(216, 7, 6, DATE_SUB(NOW(), INTERVAL 2 MONTH), 'Completed', 'Fever');
+
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(213, 213, 800.00, 800.00, 'Paid', DATE_SUB(NOW(), INTERVAL 5 MONTH)),
+(214, 214, 800.00, 800.00, 'Paid', DATE_SUB(NOW(), INTERVAL 4 MONTH)),
+(215, 215, 800.00, 800.00, 'Paid', DATE_SUB(NOW(), INTERVAL 3 MONTH)),
+(216, 216, 800.00, 800.00, 'Paid', DATE_SUB(NOW(), INTERVAL 2 MONTH));
+
+-- DOC 7 (Neuro): Rafiq
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(217, 4, 7, DATE_SUB(NOW(), INTERVAL 1 MONTH), 'Completed', 'Migraine'),
+(218, 1, 7, DATE_SUB(NOW(), INTERVAL 3 DAY), 'Completed', 'Numbness');
+
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(217, 217, 2000.00, 2000.00, 'Paid', DATE_SUB(NOW(), INTERVAL 1 MONTH)),
+(218, 218, 2000.00, 2000.00, 'Paid', DATE_SUB(NOW(), INTERVAL 3 DAY));
+
+
+-- =========================================================
+-- PATIENT ACTIVITY (Lab Tests)
+-- =========================================================
+-- Ensuring Patients 2,4,6,7 have tests (1,3,5 already active in appts)
+
+-- Patient 2 (Abdul) - XRay
+INSERT INTO patient_tests (patient_id, test_id, record_id, doctor_id, payment_status, status) VALUES (2, 2, 600, 2, 'PAID', 'COMPLETED');
+INSERT INTO invoices (invoice_id, test_record_id, total_amount, net_amount, status, generated_at) VALUES (600, 600, 800.00, 800.00, 'Paid', DATE_SUB(NOW(), INTERVAL 2 MONTH));
+
+-- Patient 4 (Kamal) - Lipid Profile
+INSERT INTO patient_tests (patient_id, test_id, record_id, doctor_id, payment_status, status) VALUES (4, 3, 601, 1, 'PAID', 'COMPLETED');
+INSERT INTO invoices (invoice_id, test_record_id, total_amount, net_amount, status, generated_at) VALUES (601, 601, 1500.00, 1500.00, 'Paid', DATE_SUB(NOW(), INTERVAL 1 MONTH));
+
+-- Patient 6 (James) - Dengue
+INSERT INTO patient_tests (patient_id, test_id, record_id, doctor_id, payment_status, status) VALUES (6, 4, 602, 6, 'PAID', 'COMPLETED');
+INSERT INTO invoices (invoice_id, test_record_id, total_amount, net_amount, status, generated_at) VALUES (602, 602, 1200.00, 1200.00, 'Paid', DATE_SUB(NOW(), INTERVAL 3 WEEK));
+
+-- Patient 7 (Anisul) - CBC
+INSERT INTO patient_tests (patient_id, test_id, record_id, doctor_id, payment_status, status) VALUES (7, 1, 603, 3, 'PAID', 'COMPLETED');
+INSERT INTO invoices (invoice_id, test_record_id, total_amount, net_amount, status, generated_at) VALUES (603, 603, 600.00, 600.00, 'Paid', DATE_SUB(NOW(), INTERVAL 1 DAY));
+
+
+-- =========================================================
+-- PAYMENTS (Matches Invoices)
+-- =========================================================
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date)
+SELECT invoice_id, net_amount, 'Cash', generated_at FROM invoices WHERE invoice_id >= 200;
+
+-- =========================================================
+-- GUARANTEED ACTIVITY SEED (ENSURES EVERYONE HAS DATA)
+-- =========================================================
+
+-- DOC 1 (Cardiologist) - Extra
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(300, 1, 1, DATE_SUB(NOW(), INTERVAL 2 DAY), 'Completed', 'Routine Heart Check');
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(300, 300, 1500.00, 1500.00, 'Paid', DATE_SUB(NOW(), INTERVAL 2 DAY));
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES (300, 1500.00, 'Cash', DATE_SUB(NOW(), INTERVAL 2 DAY));
+
+-- DOC 2 (Orthopedic) - Extra
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(301, 2, 2, DATE_SUB(NOW(), INTERVAL 3 DAY), 'Completed', 'Back Pain Review');
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(301, 301, 2000.00, 2000.00, 'Paid', DATE_SUB(NOW(), INTERVAL 3 DAY));
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES (301, 2000.00, 'Card', DATE_SUB(NOW(), INTERVAL 3 DAY));
+
+-- DOC 3 (Pediatrician) - Extra
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(302, 3, 3, DATE_SUB(NOW(), INTERVAL 4 DAY), 'Completed', 'Growth Check');
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(302, 302, 1200.00, 1200.00, 'Paid', DATE_SUB(NOW(), INTERVAL 4 DAY));
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES (302, 1200.00, 'Cash', DATE_SUB(NOW(), INTERVAL 4 DAY));
+
+-- DOC 4 (Dermatologist) - Extra
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(303, 4, 4, DATE_SUB(NOW(), INTERVAL 5 DAY), 'Completed', 'Skin Allergy');
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(303, 303, 1800.00, 1800.00, 'Paid', DATE_SUB(NOW(), INTERVAL 5 DAY));
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES (303, 1800.00, 'Online', DATE_SUB(NOW(), INTERVAL 5 DAY));
+
+-- DOC 5 (Gynecology) - Extra
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(304, 5, 5, DATE_SUB(NOW(), INTERVAL 6 DAY), 'Completed', 'Consultation');
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(304, 304, 1500.00, 1500.00, 'Paid', DATE_SUB(NOW(), INTERVAL 6 DAY));
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES (304, 1500.00, 'Cash', DATE_SUB(NOW(), INTERVAL 6 DAY));
+
+-- DOC 6 (General Med) - Extra
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(305, 6, 6, DATE_SUB(NOW(), INTERVAL 7 DAY), 'Completed', 'General Checkup');
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(305, 305, 800.00, 800.00, 'Paid', DATE_SUB(NOW(), INTERVAL 7 DAY));
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES (305, 800.00, 'Card', DATE_SUB(NOW(), INTERVAL 7 DAY));
+
+-- DOC 7 (Neuro) - Extra
+INSERT INTO appointments (appointment_id, patient_id, doctor_id, appointment_date, status, reason) VALUES
+(306, 7, 7, DATE_SUB(NOW(), INTERVAL 8 DAY), 'Completed', 'Headache Followup');
+INSERT INTO invoices (invoice_id, appointment_id, total_amount, net_amount, status, generated_at) VALUES
+(306, 306, 2000.00, 2000.00, 'Paid', DATE_SUB(NOW(), INTERVAL 8 DAY));
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES (306, 2000.00, 'Cash', DATE_SUB(NOW(), INTERVAL 8 DAY));
+
+-- EXTRA PATIENT TESTS
+INSERT INTO patient_tests (patient_id, test_id, record_id, doctor_id, payment_status, status) VALUES 
+(5, 1, 700, 1, 'PAID', 'COMPLETED'), -- Salma CBC
+(6, 2, 701, 2, 'PAID', 'COMPLETED'), -- James XRay
+(7, 3, 702, 6, 'PAID', 'COMPLETED'); -- Anisul Lipid
+
+INSERT INTO invoices (invoice_id, test_record_id, total_amount, net_amount, status, generated_at) VALUES 
+(700, 700, 600.00, 600.00, 'Paid', DATE_SUB(NOW(), INTERVAL 1 DAY)),
+(701, 701, 800.00, 800.00, 'Paid', DATE_SUB(NOW(), INTERVAL 2 DAY)),
+(702, 702, 1200.00, 1200.00, 'Paid', DATE_SUB(NOW(), INTERVAL 3 DAY));
+
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES
+(700, 600.00, 'Cash', DATE_SUB(NOW(), INTERVAL 1 DAY)),
+(701, 800.00, 'Card', DATE_SUB(NOW(), INTERVAL 2 DAY)),
+(702, 1200.00, 'Online', DATE_SUB(NOW(), INTERVAL 3 DAY));
