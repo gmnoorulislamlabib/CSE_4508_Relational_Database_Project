@@ -1,6 +1,7 @@
 import { getDashboardStats, getRecentAppointments, getActiveDoctors } from '@/lib/actions';
 import { Users, Calendar, DollarSign, Activity, Plus } from 'lucide-react';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 
 export default async function DashboardPage() {
     // Add try/catch to handle DB connection errors gracefully during first run
@@ -8,6 +9,15 @@ export default async function DashboardPage() {
     let recentAppointments: any[] = [];
     let activeDoctorsList: any[] = [];
     let error = null;
+
+    const cookieStore = await cookies();
+    const session = cookieStore.get('session');
+    let role = null;
+    if (session) {
+        try {
+            role = JSON.parse(session.value).role;
+        } catch (e) { }
+    }
 
     try {
         stats = await getDashboardStats();
@@ -34,14 +44,17 @@ export default async function DashboardPage() {
                     <h2 className="text-2xl font-bold text-slate-800">Dashboard Overview</h2>
                     <p className="text-slate-500">Welcome back, here's what's happening today.</p>
                 </div>
-                <div className="flex gap-3">
-                    <Link href="/dashboard/appointments/new" className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
-                        <Plus size={18} /> New Appointment
-                    </Link>
-                    <Link href="/dashboard/patients/new" className="flex items-center gap-2 bg-white text-slate-700 border border-slate-200 px-4 py-2 rounded-lg hover:bg-slate-50 transition-colors">
-                        <Users size={18} /> Register Patient
-                    </Link>
-                </div>
+                {/* Action Buttons: Visible only if NOT Admin */}
+                {role !== 'Admin' && (
+                    <div className="flex gap-3">
+                        <Link href="/dashboard/appointments/new" className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
+                            <Plus size={18} /> New Appointment
+                        </Link>
+                        <Link href="/dashboard/patients/new" className="flex items-center gap-2 bg-white text-slate-700 border border-slate-200 px-4 py-2 rounded-lg hover:bg-slate-50 transition-colors">
+                            <Users size={18} /> Register Patient
+                        </Link>
+                    </div>
+                )}
             </div>
 
             {/* Stats Grid */}

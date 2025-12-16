@@ -24,15 +24,18 @@ import { useFormStatus } from 'react-dom';
   2. Outpatient & Services (Consultation, Lab)
 */
 
-export default function RoomBookingClient({ patients, availability }: { patients: any[], availability: any }) {
+export default function RoomBookingClient({ patients, availability, role }: { patients: any[], availability: any, role?: string }) {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+
+    // Admin is read-only
+    const canBook = role !== 'Admin';
 
     const categories = [
         {
             id: 'inpatient',
             title: 'Room Booking',
-            description: 'Book rooms for admitted patients.',
+            description: canBook ? 'Book rooms for admitted patients.' : 'View hospital room availability (Read Only).',
             icon: <Bed className="w-8 h-8 text-blue-600" />,
             types: [
                 { id: 'ICU', label: 'ICU (Intensive Care)', charge: '৳10,000', icon: <Activity className="text-red-500" /> },
@@ -50,8 +53,9 @@ export default function RoomBookingClient({ patients, availability }: { patients
             <div className="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl p-8 text-white shadow-lg">
                 <h2 className="text-3xl font-bold mb-2">Hospital Room Booking</h2>
                 <p className="text-blue-100 max-w-xl">
-                    Select a category below to check availability and book rooms for registered patients.
-                    Ensure patient registration is complete before proceeding.
+                    {canBook
+                        ? "Select a category below to check availability and book rooms for registered patients."
+                        : "Administrator View: Monitoring current room occupancy and availability."}
                 </p>
             </div>
 
@@ -77,16 +81,16 @@ export default function RoomBookingClient({ patients, availability }: { patients
                                 return (
                                     <button
                                         key={type.id}
-                                        onClick={() => isAvailable && setSelectedCategory(type.id)}
-                                        disabled={!isAvailable}
+                                        onClick={() => canBook && isAvailable && setSelectedCategory(type.id)}
+                                        disabled={!isAvailable || !canBook}
                                         className={`w-full flex items-center justify-between p-4 rounded-lg border transition-all group group text-left
-                                            ${isAvailable
+                                            ${isAvailable && canBook
                                                 ? 'border-slate-100 hover:border-blue-500 hover:bg-blue-50 cursor-pointer'
-                                                : 'border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed'}`}
+                                                : 'border-slate-100 bg-slate-50 opacity-80 cursor-default'}`}
                                     >
                                         <div className="flex items-center gap-3">
                                             <div className={isAvailable ? '' : 'grayscale'}>{type.icon}</div>
-                                            <span className={`font-medium ${isAvailable ? 'text-slate-700 group-hover:text-blue-700' : 'text-slate-400'}`}>
+                                            <span className={`font-medium ${isAvailable && canBook ? 'text-slate-700 group-hover:text-blue-700' : 'text-slate-500'}`}>
                                                 {type.label}
                                             </span>
                                         </div>
@@ -96,9 +100,11 @@ export default function RoomBookingClient({ patients, availability }: { patients
                                                     <span className="text-xs font-semibold bg-green-100 text-green-700 px-2 py-1 rounded">
                                                         {count} Available
                                                     </span>
-                                                    <span className="text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity text-sm font-bold">
-                                                        Book &rarr;
-                                                    </span>
+                                                    {canBook && (
+                                                        <span className="text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity text-sm font-bold">
+                                                            Book &rarr;
+                                                        </span>
+                                                    )}
                                                 </>
                                             ) : (
                                                 <span className="text-xs font-semibold bg-red-100 text-red-600 px-2 py-1 rounded">

@@ -318,6 +318,27 @@ export async function updateTestResult(recordId: number, resultSummary: string) 
     try {
         await connection.beginTransaction();
 
+        const [rows] = await connection.query(
+            `SELECT scheduled_end_time FROM patient_tests WHERE record_id = ?`,
+            [recordId]
+        );
+        const testRecord = (rows as any)[0];
+
+        if (testRecord && testRecord.scheduled_end_time) {
+            const endTime = new Date(testRecord.scheduled_end_time);
+            const now = new Date();
+
+            // Allow 10 seconds buffer or strictly enforce? 
+            // Using strict check as per request ("only after the time duration has passed")
+            if (now < endTime) {
+                await connection.rollback();
+                const diffMs = endTime.getTime() - now.getTime();
+                const minutes = Math.floor(diffMs / 60000);
+                const seconds = Math.floor((diffMs % 60000) / 1000);
+                return { success: false, error: `Test is processing. Time remaining: ${minutes}m ${seconds}s` };
+            }
+        }
+
         await connection.execute(
             `UPDATE patient_tests SET status = 'COMPLETED', result_summary = ? WHERE record_id = ?`,
             [resultSummary, recordId]
@@ -336,6 +357,23 @@ export async function updateTestResult(recordId: number, resultSummary: string) 
 }
 
 export async function getPendingTests() {
+    // AUTO-UPDATE LOGIC:
+    // Automatically mark tests as COMPLETED if their scheduled duration has passed.
+    try {
+        await pool.query(`
+            UPDATE patient_tests pt
+            JOIN medical_tests t ON pt.test_id = t.test_id
+            SET 
+                pt.status = 'COMPLETED',
+                pt.result_summary = CONCAT('Auto-generated Result for ', t.test_name, ': Analysis completed successfully. Parameters within normal range.')
+            WHERE 
+                pt.status = 'SCHEDULED' 
+                AND pt.scheduled_end_time <= NOW()
+        `);
+    } catch (e) {
+        console.error("Auto-update tests failed:", e);
+    }
+
     const [rows] = await pool.query(`
         SELECT 
             pt.record_id,
@@ -635,9 +673,88 @@ export async function processPayment(invoiceId: number, amount: number, method: 
     }
 }
 
-export async function getUnpaidInvoices() {
-    // Joining multiple tables for a rich view
+// --- Invoice Details ---
+
+export async function getInvoiceDetails(invoiceId: string) {
+    // 1. Fetch Header Info
     const [rows] = await pool.query(`
+        SELECT 
+            i.invoice_id,
+            i.total_amount,
+            i.status,
+            i.generated_at,
+            i.pharmacy_order_id,
+            i.appointment_id,
+            i.test_record_id,
+            CONCAT(p.first_name, ' ', p.last_name) as patient_name,
+            p.phone_number,
+            p.address,
+            u.email
+        FROM invoices i
+        LEFT JOIN appointments a ON i.appointment_id = a.appointment_id
+        LEFT JOIN patient_tests pt ON i.test_record_id = pt.record_id
+        LEFT JOIN pharmacy_orders po ON i.pharmacy_order_id = po.order_id
+        -- Coalesce patient ID from any source
+        LEFT JOIN patients pat ON pat.patient_id = COALESCE(a.patient_id, pt.patient_id, po.patient_id)
+        LEFT JOIN profiles p ON pat.user_id = p.user_id
+        LEFT JOIN users u ON p.user_id = u.user_id
+        WHERE i.invoice_id = ?
+    `, [invoiceId]);
+
+    const invoice = (rows as any)[0];
+    if (!invoice) return null;
+
+    let items: any[] = [];
+
+    // 2. Fetch Line Items based on Type
+    if (invoice.pharmacy_order_id) {
+        const [pRows] = await pool.query(`
+            SELECT 
+                m.name as description, 
+                poi.quantity, 
+                poi.unit_price as unit_price,
+                (poi.quantity * poi.unit_price) as total
+            FROM pharmacy_order_items poi
+            JOIN medicines m ON poi.medicine_id = m.medicine_id
+            WHERE poi.order_id = ?
+        `, [invoice.pharmacy_order_id]);
+        items = pRows as any[];
+    } else if (invoice.test_record_id) {
+        const [tRows] = await pool.query(`
+            SELECT 
+                t.test_name as description, 
+                1 as quantity, 
+                t.cost as unit_price,
+                t.cost as total
+            FROM patient_tests pt
+            JOIN medical_tests t ON pt.test_id = t.test_id
+            WHERE pt.record_id = ?
+        `, [invoice.test_record_id]);
+        items = tRows as any[];
+    } else if (invoice.appointment_id) {
+        // Simple Consultation Fee
+        const [aRows] = await pool.query(`
+            SELECT 
+                CONCAT('Consultation - ', d_prof.last_name) as description, 
+                1 as quantity, 
+                i.total_amount as unit_price,
+                i.total_amount as total
+            FROM invoices i
+            JOIN appointments a ON i.appointment_id = a.appointment_id
+            JOIN doctors d ON a.doctor_id = d.doctor_id
+            JOIN profiles d_prof ON d.user_id = d_prof.user_id
+            WHERE i.invoice_id = ?
+        `, [invoiceId]);
+        items = aRows as any[];
+    }
+
+    return { ...invoice, items };
+}
+
+export async function getUnpaidInvoices() {
+    // UNION of Appointment/Test Invoices and Pharmacy Invoices
+    const [rows] = await pool.query(`
+        -- 1. Appointment & Test Invoices (Linked via Appointment)
         SELECT 
             i.invoice_id,
             i.total_amount,
@@ -652,8 +769,133 @@ export async function getUnpaidInvoices() {
         JOIN doctors doc ON a.doctor_id = doc.doctor_id
         JOIN profiles d ON doc.user_id = d.user_id
         WHERE i.status = 'Unpaid'
+
+        UNION ALL
+
+        -- 2. Pharmacy Invoices (Linked via Pharmacy Order)
+        SELECT 
+            i.invoice_id,
+            i.total_amount,
+            i.status,
+            p.first_name as patient_name,
+            'Pharmacy' as doctor_name, -- Placeholder for doctor name column
+            po.created_at as appointment_date -- Use order date as date
+        FROM invoices i
+        JOIN pharmacy_orders po ON i.pharmacy_order_id = po.order_id
+        JOIN patients pat ON po.patient_id = pat.patient_id
+        JOIN profiles p ON pat.user_id = p.user_id
+        WHERE i.status = 'Unpaid'
+        
+        UNION ALL
+
+        -- 3. Test Only Invoices (If any, linked via Test Record but NO Appointment - rare but possible)
+        SELECT 
+            i.invoice_id,
+            i.total_amount,
+            i.status,
+            p.first_name as patient_name,
+            'Laboratory' as doctor_name,
+            pt.scheduled_date as appointment_date
+        FROM invoices i
+        JOIN patient_tests pt ON i.test_record_id = pt.record_id
+        JOIN patients pat ON pt.patient_id = pat.patient_id
+        JOIN profiles p ON pat.user_id = p.user_id
+        WHERE i.status = 'Unpaid' 
+        AND i.appointment_id IS NULL -- Avoid duplicates if test is linked to appt
     `);
     return rows;
+}
+
+// --- Pharmacy ---
+
+export async function getMedicines() {
+    const [rows] = await pool.query('SELECT * FROM medicines ORDER BY name');
+    return rows as any[];
+}
+
+export async function restockMedicine(formData: FormData) {
+    const medicineId = formData.get('medicineId');
+    const quantity = parseInt(formData.get('quantity') as string);
+    const unitCost = parseFloat(formData.get('unitCost') as string);
+    const totalCost = quantity * unitCost;
+
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // 1. Update Stock
+        await connection.execute(
+            `UPDATE medicines SET stock_quantity = stock_quantity + ? WHERE medicine_id = ?`,
+            [quantity, medicineId]
+        );
+
+        // 2. Log Expense
+        await connection.execute(
+            `INSERT INTO hospital_expenses (category, description, amount, recorded_by) 
+             VALUES ('Pharmacy_Restock', CONCAT('Restock Item #', ?), ?, NULL)`,
+            [medicineId, totalCost]
+        );
+
+        await connection.commit();
+        revalidatePath('/dashboard/pharmacy');
+        return { success: true };
+    } catch (e: any) {
+        await connection.rollback();
+        return { success: false, error: e.message };
+    } finally {
+        connection.release();
+    }
+}
+
+export async function createPharmacySale(patientId: number, items: { medicineId: number, quantity: number, price: number }[]) {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        // 1. Calculate Total
+        const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+
+        // 2. Create Order
+        const [orderRes] = await connection.execute(
+            `INSERT INTO pharmacy_orders (patient_id, total_amount, status) VALUES (?, ?, 'Pending_Payment')`,
+            [patientId, totalAmount]
+        );
+        const orderId = (orderRes as any).insertId;
+
+        // 3. Create Items
+        for (const item of items) {
+            // Check stock availability first (UI checks too, but DB safety)
+            const [stockRes] = await connection.query('SELECT stock_quantity FROM medicines WHERE medicine_id = ?', [item.medicineId]);
+            const currentStock = (stockRes as any)[0]?.stock_quantity || 0;
+
+            if (currentStock < item.quantity) {
+                throw new Error(`Insufficient stock for item #${item.medicineId}. Available: ${currentStock}`);
+            }
+
+            await connection.execute(
+                `INSERT INTO pharmacy_order_items (order_id, medicine_id, quantity, unit_price) VALUES (?, ?, ?, ?)`,
+                [orderId, item.medicineId, item.quantity, item.price]
+            );
+        }
+
+        // 4. Create Invoice (Unpaid)
+        const [invRes] = await connection.execute(
+            `INSERT INTO invoices (pharmacy_order_id, total_amount, net_amount, status, generated_at) 
+             VALUES (?, ?, ?, 'Unpaid', NOW())`,
+            [orderId, totalAmount, totalAmount]
+        );
+        const invoiceId = (invRes as any).insertId;
+
+        await connection.commit();
+        revalidatePath('/dashboard/pharmacy');
+        revalidatePath('/dashboard/billing');
+        return { success: true, invoiceId };
+    } catch (e: any) {
+        await connection.rollback();
+        return { success: false, error: e.message };
+    } finally {
+        connection.release();
+    }
 }
 
 export async function getAllAppointments(filter?: 'today' | 'upcoming' | 'all') {
@@ -686,7 +928,24 @@ export async function getAllPatients(query: string = '') {
             CONCAT(p.emergency_contact_first_name, ' ', p.emergency_contact_last_name) AS emergency_contact_name,
             p.medical_history_summary,
             p.test_history_summary,
-            u.email
+            u.email,
+            -- Calculate Total Spent
+            (SELECT COALESCE(SUM(i.net_amount), 0) 
+             FROM invoices i 
+             LEFT JOIN appointments a ON i.appointment_id = a.appointment_id
+             LEFT JOIN pharmacy_orders po ON i.pharmacy_order_id = po.order_id
+             LEFT JOIN patient_tests pt ON i.test_record_id = pt.record_id
+             WHERE (a.patient_id = p.patient_id OR po.patient_id = p.patient_id OR pt.patient_id = p.patient_id)
+             AND i.status = 'Paid') as total_spent,
+             
+            -- Aggregate Pharmacy History
+            (SELECT GROUP_CONCAT(DISTINCT 
+                CONCAT(DATE_FORMAT(po2.created_at, '%Y-%m-%d %h:%i%p'), ': ৳', inv.total_amount)
+                ORDER BY po2.created_at DESC SEPARATOR '\n')
+             FROM pharmacy_orders po2
+             JOIN invoices inv ON po2.order_id = inv.pharmacy_order_id
+             WHERE po2.patient_id = p.patient_id AND inv.status = 'Paid') as pharmacy_history_summary
+
         FROM patients p
         JOIN users u ON p.user_id = u.user_id
         JOIN profiles prof ON u.user_id = prof.user_id

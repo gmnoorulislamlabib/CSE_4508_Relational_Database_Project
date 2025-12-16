@@ -28,35 +28,77 @@ WHERE d.consultation_fee > (SELECT AVG(consultation_fee) FROM doctors)`
         title: "Revenue by Department",
         description: "Rollup aggregation of revenue by department (Grand Total included)",
         sql: `SELECT 
-    COALESCE(dept.name, 'GRAND TOTAL') AS department,
-    SUM(i.net_amount) AS total_revenue
-FROM invoices i
-JOIN appointments a ON i.appointment_id = a.appointment_id
-JOIN doctors d ON a.doctor_id = d.doctor_id
-JOIN departments dept ON d.dept_id = dept.dept_id
-WHERE i.status = 'Paid'
-GROUP BY dept.name WITH ROLLUP`
+    COALESCE(department, 'GRAND TOTAL') AS department,
+    SUM(revenue) AS total_revenue
+FROM (
+    SELECT 
+        dept.name AS department,
+        i.net_amount AS revenue
+    FROM invoices i
+    JOIN appointments a ON i.appointment_id = a.appointment_id
+    JOIN doctors d ON a.doctor_id = d.doctor_id
+    JOIN departments dept ON d.dept_id = dept.dept_id
+    WHERE i.status = 'Paid'
+
+    UNION ALL
+    
+    SELECT 
+        'Laboratory' AS department,
+        i.net_amount AS revenue
+    FROM invoices i
+    WHERE i.test_record_id IS NOT NULL 
+    AND i.status = 'Paid'
+
+    UNION ALL
+
+    SELECT 
+        'Pharmacy Sales' AS department,
+        i.net_amount AS revenue
+    FROM invoices i
+    WHERE i.pharmacy_order_id IS NOT NULL
+    AND i.status = 'Paid'
+
+    UNION ALL
+
+    SELECT
+        'Pharmacy (Restock Expenses)' AS department,
+        -(amount) AS revenue
+    FROM hospital_expenses
+    WHERE category = 'Pharmacy_Restock'
+
+) AS combined_revenue
+GROUP BY department WITH ROLLUP`
     },
     {
         id: 3,
         title: "Patient Spending Rank",
-        description: "Ranking patients by total spend (Window Function)",
+        description: "Ranking patients by total spend across all services (Window Function)",
         sql: `SELECT 
-    CONCAT(p.first_name, ' ', p.last_name) AS patient_name,
+    CONCAT(prof.first_name, ' ', prof.last_name) AS patient_name,
     SUM(i.net_amount) AS total_spent,
     RANK() OVER (ORDER BY SUM(i.net_amount) DESC) AS spending_rank
-FROM patients pat
-JOIN profiles p ON pat.user_id = p.user_id
-JOIN appointments a ON pat.patient_id = a.patient_id
-JOIN invoices i ON a.appointment_id = i.appointment_id
+FROM invoices i
+LEFT JOIN appointments a ON i.appointment_id = a.appointment_id
+LEFT JOIN patient_tests pt ON i.test_record_id = pt.record_id
+LEFT JOIN pharmacy_orders po ON i.pharmacy_order_id = po.order_id
+JOIN patients pat ON pat.patient_id = COALESCE(a.patient_id, pt.patient_id, po.patient_id)
+JOIN profiles prof ON pat.user_id = prof.user_id
 WHERE i.status = 'Paid'
-GROUP BY pat.patient_id, p.first_name, p.last_name`
+GROUP BY pat.patient_id, prof.first_name, prof.last_name`
     },
     {
         id: 4,
         title: "Financial Performance (View)",
-        description: "Yearly, Monthly, and Weekly Revenue (Pre-calculated View)",
-        sql: `SELECT * FROM financial_reports`
+        description: "Yearly, Monthly, and Weekly Revenue (Pre-calculated table)",
+        sql: `SELECT 
+    report_type AS Report_Type,
+    period_label AS Period,
+    CONCAT('৳', FORMAT(total_revenue, 2)) AS Revenue,
+    DATE_FORMAT(last_updated, '%M %d, %Y %h:%i %p') AS Last_Updated
+FROM financial_reports
+ORDER BY 
+    FIELD(report_type, 'Yearly', 'Monthly', 'Weekly'), 
+    period_label DESC`
     }
 ];
 

@@ -23,5 +23,12 @@ export default async function TestsPage() {
         );
     }
 
-    return <TestsClient tests={tests} patients={patients} doctors={doctors} />;
+    // Auth Check for Admin
+    const { cookies } = require('next/headers');
+    const cookieStore = await cookies();
+    const session = cookieStore.get('session');
+    let role = null;
+    try { role = JSON.parse(session.value).role; } catch (e) { }
+
+    return <TestsClient tests={tests} patients={patients} doctors={doctors} role={role} />;
 }

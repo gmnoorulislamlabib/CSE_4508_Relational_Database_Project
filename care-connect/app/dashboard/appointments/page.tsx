@@ -1,10 +1,19 @@
 import { getAllAppointments, generateInvoice } from '@/lib/actions';
 import { BadgeCheck, Clock, XCircle, FileText } from 'lucide-react';
+import { cookies } from 'next/headers';
 
 export default async function AppointmentsPage(props: { searchParams: Promise<{ filter?: 'today' | 'upcoming' | 'all' }> }) {
     const searchParams = await props.searchParams;
     const filter = searchParams?.filter;
     const appointments = await getAllAppointments(filter);
+    const cookieStore = await cookies();
+    const session = cookieStore.get('session');
+    let role = null;
+    if (session) {
+        try {
+            role = JSON.parse(session.value).role;
+        } catch (e) { }
+    }
 
     // Debug log to terminal to confirm filter value
     console.log('Appointments Page Filter:', filter);
@@ -40,13 +49,13 @@ export default async function AppointmentsPage(props: { searchParams: Promise<{ 
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {appointments.length === 0 ? (
+                        {(appointments as any[]).length === 0 ? (
                             <tr>
                                 <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
                                     No appointments found matching this filter.
                                 </td>
                             </tr>
-                        ) : appointments.map((appt: any) => (
+                        ) : (appointments as any[]).map((appt: any) => (
                             <tr key={appt.appointment_id} className="hover:bg-slate-50/50 transition-colors">
                                 <td className="px-6 py-4 text-slate-500">#{appt.appointment_id}</td>
                                 <td className="px-6 py-4 font-medium text-slate-900">{appt.patient_name}</td>
@@ -60,7 +69,7 @@ export default async function AppointmentsPage(props: { searchParams: Promise<{ 
                                 </td>
                                 <td className="px-6 py-4">
                                     {/* Only allow generating invoice if completed and not yet billed (simplified check) */}
-                                    {appt.status === 'Completed' && !appt.total_amount ? (
+                                    {role !== 'Admin' && appt.status === 'Completed' && !appt.total_amount ? (
                                         <form action={async () => {
                                             'use server';
                                             await generateInvoice(appt.appointment_id);

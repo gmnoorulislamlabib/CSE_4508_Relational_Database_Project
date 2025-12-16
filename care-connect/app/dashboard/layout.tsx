@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { LayoutDashboard, Users, Calendar, FileText, Settings, LogOut, HeartPulse, Building2, Microscope, Bed } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, FileText, Settings, LogOut, HeartPulse, Building2, Microscope, Bed, Package } from 'lucide-react';
 import { cookies } from 'next/headers';
 
 export default async function DashboardLayout({
@@ -39,13 +39,16 @@ export default async function DashboardLayout({
                     </div>
 
                     <NavItem href="/dashboard" icon={<LayoutDashboard size={20} />} label="Overview" />
-                    <NavItem href="/dashboard/rooms" icon={<Bed size={20} />} label="Book a Room" />
+                    {!isAdmin && (
+                        <NavItem href="/dashboard/rooms" icon={<Bed size={20} />} label="Book a Room" />
+                    )}
                     <NavItem href="/dashboard/reception" icon={<Building2 size={20} />} label="Reception View" />
                     <NavItem href="/dashboard/tests" icon={<Microscope size={20} />} label="Available Tests" />
                     <NavItem href="/dashboard/appointments" icon={<Calendar size={20} />} label="Appointments" />
                     <NavItem href="/dashboard/patients" icon={<Users size={20} />} label="Patients" />
                     <NavItem href="/dashboard/doctors" icon={<HeartPulse size={20} />} label="Doctors Directory" />
                     <NavItem href="/dashboard/billing" icon={<FileText size={20} />} label="Billing & Invoices" />
+                    <NavItem href="/dashboard/pharmacy" icon={<Package size={20} />} label="Pharmacy" />
 
                     {isAdmin && (
                         <>

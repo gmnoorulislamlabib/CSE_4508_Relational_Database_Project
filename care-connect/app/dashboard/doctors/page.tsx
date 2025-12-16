@@ -1,8 +1,18 @@
 import { getActiveDoctors } from '@/lib/actions';
 import { Activity, MapPin, Stethoscope, Building2 } from 'lucide-react';
+import { cookies } from 'next/headers';
 
 export default async function DoctorsPage() {
     const doctors = await getActiveDoctors() as any[];
+    const cookieStore = await cookies();
+    const session = cookieStore.get('session');
+    let role = null;
+    if (session) {
+        try {
+            const data = JSON.parse(session.value);
+            role = data.role;
+        } catch (e) { }
+    }
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -16,11 +26,13 @@ export default async function DoctorsPage() {
                 </p>
             </div>
 
-            <div className="flex justify-end">
-                <a href="/dashboard/doctors/new" className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20">
-                    <Activity size={18} /> Add New Doctor
-                </a>
-            </div>
+            {role === 'Admin' && (
+                <div className="flex justify-end">
+                    <a href="/dashboard/doctors/new" className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20">
+                        <Activity size={18} /> Add New Doctor
+                    </a>
+                </div>
+            )}
 
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">

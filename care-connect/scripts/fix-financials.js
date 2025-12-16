@@ -40,13 +40,6 @@ async function fixFinancials() {
                 SELECT 'Yearly', DATE_FORMAT(payment_date, '%Y'), SUM(amount)
                 FROM payments
                 GROUP BY DATE_FORMAT(payment_date, '%Y');
-                
-                INSERT INTO financial_reports (report_type, period_label, total_revenue)
-                SELECT 'Yearly', DATE_FORMAT(generated_at, '%Y'), SUM(net_amount)
-                FROM invoices 
-                WHERE status = 'Paid' AND test_record_id IS NOT NULL
-                GROUP BY DATE_FORMAT(generated_at, '%Y')
-                ON DUPLICATE KEY UPDATE total_revenue = total_revenue + VALUES(total_revenue);
 
                 -- B. MONTHLY
                 INSERT INTO financial_reports (report_type, period_label, total_revenue)
@@ -54,25 +47,11 @@ async function fixFinancials() {
                 FROM payments
                 GROUP BY DATE_FORMAT(payment_date, '%Y-%m');
 
-                INSERT INTO financial_reports (report_type, period_label, total_revenue)
-                SELECT 'Monthly', DATE_FORMAT(generated_at, '%Y-%m'), SUM(net_amount)
-                FROM invoices 
-                WHERE status = 'Paid' AND test_record_id IS NOT NULL
-                GROUP BY DATE_FORMAT(generated_at, '%Y-%m')
-                ON DUPLICATE KEY UPDATE total_revenue = total_revenue + VALUES(total_revenue);
-
                 -- C. WEEKLY
                 INSERT INTO financial_reports (report_type, period_label, total_revenue)
                 SELECT 'Weekly', DATE_FORMAT(payment_date, '%x-W%v'), SUM(amount)
                 FROM payments
                 GROUP BY DATE_FORMAT(payment_date, '%x-W%v');
-
-                INSERT INTO financial_reports (report_type, period_label, total_revenue)
-                SELECT 'Weekly', DATE_FORMAT(generated_at, '%x-W%v'), SUM(net_amount)
-                FROM invoices 
-                WHERE status = 'Paid' AND test_record_id IS NOT NULL
-                GROUP BY DATE_FORMAT(generated_at, '%x-W%v')
-                ON DUPLICATE KEY UPDATE total_revenue = total_revenue + VALUES(total_revenue);
 
             END
         `);
@@ -108,29 +87,6 @@ async function fixFinancials() {
         `);
 
         await connection.query(`DROP TRIGGER IF EXISTS trg_update_financials_on_invoice;`);
-        await connection.query(`
-            CREATE TRIGGER trg_update_financials_on_invoice
-            AFTER INSERT ON invoices
-            FOR EACH ROW
-            BEGIN
-                IF NEW.status = 'Paid' AND NEW.test_record_id IS NOT NULL THEN
-                    -- Upate Yearly
-                    INSERT INTO financial_reports (report_type, period_label, total_revenue)
-                    VALUES ('Yearly', DATE_FORMAT(NEW.generated_at, '%Y'), NEW.net_amount)
-                    ON DUPLICATE KEY UPDATE total_revenue = total_revenue + NEW.net_amount;
-
-                    -- Update Monthly
-                    INSERT INTO financial_reports (report_type, period_label, total_revenue)
-                    VALUES ('Monthly', DATE_FORMAT(NEW.generated_at, '%Y-%m'), NEW.net_amount)
-                    ON DUPLICATE KEY UPDATE total_revenue = total_revenue + NEW.net_amount;
-
-                    -- Update Weekly
-                    INSERT INTO financial_reports (report_type, period_label, total_revenue)
-                    VALUES ('Weekly', DATE_FORMAT(NEW.generated_at, '%x-W%v'), NEW.net_amount)
-                    ON DUPLICATE KEY UPDATE total_revenue = total_revenue + NEW.net_amount;
-                END IF;
-            END
-        `);
 
 
         console.log('✅ Financial Reports Table Fixed & Populated.');

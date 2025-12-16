@@ -1,12 +1,23 @@
 import { getUnpaidInvoices, processPayment, getFinancialSummary } from '@/lib/actions';
 import { CreditCard, Banknote, TrendingUp, Calendar, Clock } from 'lucide-react';
+import Link from 'next/link';
+import { cookies } from 'next/headers';
 
-export default async function BillingPage({ searchParams }: { searchParams: { invoice?: string } }) {
+export default async function BillingPage({ searchParams }: { searchParams: Promise<{ invoice?: string }> }) {
+    const params = await searchParams; // searchParams is a Promise in Next 15+
     const invoices = (await getUnpaidInvoices()) as any[];
     const finStats = await getFinancialSummary();
+    const cookieStore = await cookies();
+    const session = cookieStore.get('session');
+    let role = null;
+    if (session) {
+        try {
+            role = JSON.parse(session.value).role;
+        } catch (e) { }
+    }
 
     // Auto-focus logic for "Pay Now" link from Booking
-    const highlightInvoiceId = searchParams?.invoice ? parseInt(searchParams.invoice) : null;
+    const highlightInvoiceId = params?.invoice ? parseInt(params.invoice) : null;
 
     return (
         <div className="space-y-8 animate-fade-in">
@@ -87,14 +98,32 @@ export default async function BillingPage({ searchParams }: { searchParams: { in
                                 </div>
                             </div>
 
-                            <form action={async () => {
-                                'use server';
-                                await processPayment(inv.invoice_id, inv.total_amount, 'Cash');
-                            }}>
-                                <button className="w-full py-2.5 bg-slate-900 text-white font-medium rounded-lg flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors active:scale-95 duration-150">
-                                    <Banknote size={16} /> Mark Paid (Cash)
-                                </button>
-                            </form>
+                            {role !== 'Admin' && (
+                                <div className="flex gap-2">
+                                    <Link
+                                        href={`/dashboard/billing/${inv.invoice_id}`}
+                                        className="flex-1 py-2.5 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors"
+                                    >
+                                        Details
+                                    </Link>
+                                    <form action={async () => {
+                                        'use server';
+                                        await processPayment(inv.invoice_id, inv.total_amount, 'Cash');
+                                    }} className="flex-1">
+                                        <button className="w-full py-2.5 bg-slate-900 text-white font-medium rounded-lg flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors active:scale-95 duration-150">
+                                            <Banknote size={16} /> Pay
+                                        </button>
+                                    </form>
+                                </div>
+                            )}
+                            {role === 'Admin' && (
+                                <Link
+                                    href={`/dashboard/billing/${inv.invoice_id}`}
+                                    className="w-full py-2.5 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors"
+                                >
+                                    View Details
+                                </Link>
+                            )}
                         </div>
                     ))}
                 </div>

@@ -330,31 +330,30 @@ END //
 -- 7. Get Financial Analytics (Heavy Aggregation)
 CREATE PROCEDURE GetFinancialSummary()
 BEGIN
-    -- Sum from both payments table AND paid test invoices (which might not have payment records)
     SELECT 
         COALESCE(
             (SELECT COALESCE(SUM(amount), 0) FROM payments) + 
             (SELECT COALESCE(SUM(net_amount), 0) FROM invoices WHERE status = 'Paid' AND test_record_id IS NOT NULL),
             0
-        ) as total_all_time,
+        ) - (SELECT COALESCE(SUM(amount), 0) FROM hospital_expenses WHERE category = 'Pharmacy_Restock') as total_all_time,
         
         COALESCE(
             (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payment_date >= DATE_SUB(NOW(), INTERVAL 1 YEAR)) +
             (SELECT COALESCE(SUM(net_amount), 0) FROM invoices WHERE status = 'Paid' AND test_record_id IS NOT NULL AND generated_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)),
             0
-        ) as total_last_year,
+        ) - (SELECT COALESCE(SUM(amount), 0) FROM hospital_expenses WHERE category = 'Pharmacy_Restock' AND expense_date >= DATE_SUB(NOW(), INTERVAL 1 YEAR)) as total_last_year,
         
         COALESCE(
             (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payment_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) +
             (SELECT COALESCE(SUM(net_amount), 0) FROM invoices WHERE status = 'Paid' AND test_record_id IS NOT NULL AND generated_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH)),
             0
-        ) as total_last_month,
+        ) - (SELECT COALESCE(SUM(amount), 0) FROM hospital_expenses WHERE category = 'Pharmacy_Restock' AND expense_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) as total_last_month,
         
         COALESCE(
             (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payment_date >= DATE_SUB(NOW(), INTERVAL 1 WEEK)) +
             (SELECT COALESCE(SUM(net_amount), 0) FROM invoices WHERE status = 'Paid' AND test_record_id IS NOT NULL AND generated_at >= DATE_SUB(NOW(), INTERVAL 1 WEEK)),
             0
-        ) as total_last_week;
+        ) - (SELECT COALESCE(SUM(amount), 0) FROM hospital_expenses WHERE category = 'Pharmacy_Restock' AND expense_date >= DATE_SUB(NOW(), INTERVAL 1 WEEK)) as total_last_week;
 END //
 
 -- 4. Generate Full Invoice (Complex Logic)
@@ -465,6 +464,18 @@ BEGIN
     
     IF v_paid >= v_total THEN
         UPDATE invoices SET status = 'Paid' WHERE invoice_id = NEW.invoice_id;
+    END IF;
+END //
+
+-- 3b. Auto-Schedule Appointment when Invoice is Paid (Catch-all)
+CREATE TRIGGER trg_invoice_paid_schedule_appointment
+AFTER UPDATE ON invoices
+FOR EACH ROW
+BEGIN
+    IF NEW.status = 'Paid' AND OLD.status != 'Paid' AND NEW.appointment_id IS NOT NULL THEN
+        UPDATE appointments 
+        SET status = 'Scheduled' 
+        WHERE appointment_id = NEW.appointment_id AND status = 'Pending_Payment';
     END IF;
 END //
 

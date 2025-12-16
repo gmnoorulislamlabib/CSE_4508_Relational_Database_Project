@@ -3,10 +3,20 @@ import { Plus, Search, User } from 'lucide-react';
 import Link from 'next/link';
 import { SearchInput } from './search';
 import { PatientHistoryButton } from './history-button';
+import { cookies } from 'next/headers';
 
 export default async function PatientsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
     const params = await searchParams;
     const patients = await getAllPatients(params?.q || '');
+    const cookieStore = await cookies();
+    const session = cookieStore.get('session');
+    let role = null;
+    if (session) {
+        try {
+            const data = JSON.parse(session.value);
+            role = data.role;
+        } catch (e) { }
+    }
 
     return (
         <div className="space-y-6">
@@ -15,9 +25,11 @@ export default async function PatientsPage({ searchParams }: { searchParams: Pro
                     <h2 className="text-2xl font-bold text-slate-800">Patients Directory</h2>
                     <p className="text-slate-500">Manage patient records and profiles.</p>
                 </div>
-                <Link href="/dashboard/patients/new" className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
-                    <Plus size={18} /> Add Patient
-                </Link>
+                {role !== 'Admin' && (
+                    <Link href="/dashboard/patients/new" className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
+                        <Plus size={18} /> Add Patient
+                    </Link>
+                )}
             </div>
 
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -72,7 +84,13 @@ export default async function PatientsPage({ searchParams }: { searchParams: Pro
                                         {p.emergency_contact_name || '-'}
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <PatientHistoryButton history={p.medical_history_summary} testHistory={p.test_history_summary} patientName={`${p.first_name} ${p.last_name}`} />
+                                        <PatientHistoryButton
+                                            history={p.medical_history_summary}
+                                            testHistory={p.test_history_summary}
+                                            pharmacyHistory={p.pharmacy_history_summary}
+                                            totalSpent={Number(p.total_spent)}
+                                            patientName={`${p.first_name} ${p.last_name}`}
+                                        />
                                     </td>
                                 </tr>
                             ))}

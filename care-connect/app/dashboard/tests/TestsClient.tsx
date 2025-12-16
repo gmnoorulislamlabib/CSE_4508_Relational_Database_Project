@@ -5,7 +5,7 @@ import { Microscope, Clock, TestTube, CheckCircle, AlertCircle, X, Calendar as C
 import { bookPatientTest } from '@/lib/actions';
 import { useFormStatus } from 'react-dom';
 
-export default function TestsClient({ tests, patients, doctors }: { tests: any[], patients: any[], doctors: any[] }) {
+export default function TestsClient({ tests, patients, doctors, role }: { tests: any[], patients: any[], doctors: any[], role?: string }) {
     const [selectedTest, setSelectedTest] = useState<any>(null);
     const [bookingSuccess, setBookingSuccess] = useState(false);
     const [error, setError] = useState('');
@@ -20,12 +20,16 @@ export default function TestsClient({ tests, patients, doctors }: { tests: any[]
                             Medical Tests Catalog
                         </h1>
                         <p className="text-slate-500">
-                            Select a test to book for a registered patient.
+                            {role === 'Admin'
+                                ? "View available laboratory tests and diagnostic options."
+                                : "Select a test to book for a registered patient."}
                         </p>
                     </div>
-                    <a href="/dashboard/tests/results" className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 text-sm font-medium flex items-center gap-2">
-                        <ClipboardList size={16} /> Manage Orders
-                    </a>
+                    {role !== 'Admin' && (
+                        <a href="/dashboard/tests/results" className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 text-sm font-medium flex items-center gap-2">
+                            <ClipboardList size={16} /> Manage Orders
+                        </a>
+                    )}
                 </div>
             </div>
 
@@ -53,12 +57,14 @@ export default function TestsClient({ tests, patients, doctors }: { tests: any[]
                                 <span>Duration: ~{test.estimated_duration_minutes} mins</span>
                             </div>
 
-                            <button
-                                onClick={() => setSelectedTest(test)}
-                                className="w-full py-2.5 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
-                            >
-                                Book Test
-                            </button>
+                            {role !== 'Admin' && (
+                                <button
+                                    onClick={() => setSelectedTest(test)}
+                                    className="w-full py-2.5 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    Book Test
+                                </button>
+                            )}
                         </div>
                     </div>
                 ))}

@@ -13,10 +13,15 @@ export function ResultsClient({ orders }: { orders: any[] }) {
     async function handleSave() {
         if (!selectedOrder || !resultText) return;
         setIsSaving(true);
-        await updateTestResult(selectedOrder.record_id, resultText);
+        const res = await updateTestResult(selectedOrder.record_id, resultText);
         setIsSaving(false);
-        setSelectedOrder(null);
-        setResultText('');
+
+        if (res.success) {
+            setSelectedOrder(null);
+            setResultText('');
+        } else {
+            alert(res.error || "Failed to update result.");
+        }
     }
 
     return (
@@ -65,12 +70,19 @@ export function ResultsClient({ orders }: { orders: any[] }) {
                                         {order.result_summary || '-'}
                                     </td>
                                     <td className="px-6 py-4">
-                                        <button
-                                            onClick={() => { setSelectedOrder(order); setResultText(order.result_summary || ''); }}
-                                            className="text-blue-600 hover:underline font-medium"
-                                        >
-                                            Update Result
-                                        </button>
+                                        {order.status === 'COMPLETED' ? (
+                                            <button
+                                                onClick={() => { setSelectedOrder(order); setResultText(''); }}
+                                                className="text-blue-600 hover:underline font-medium"
+                                            >
+                                                Update Result
+                                            </button>
+                                        ) : (
+                                            <span className="text-slate-400 italic text-xs flex items-center gap-1">
+                                                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                                                Processing...
+                                            </span>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
@@ -83,19 +95,35 @@ export function ResultsClient({ orders }: { orders: any[] }) {
             {selectedOrder && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl p-6">
-                        <h3 className="text-xl font-bold text-slate-900 mb-4">Update Result</h3>
+                        <h3 className="text-xl font-bold text-slate-900 mb-4">Finalize Test Result</h3>
                         <p className="text-sm text-slate-500 mb-4">
                             Rank: {selectedOrder.test_name} for <strong>{selectedOrder.patient_name}</strong>
                         </p>
 
                         <div className="mb-4">
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Result Summary</label>
-                            <textarea
-                                value={resultText}
-                                onChange={(e) => setResultText(e.target.value)}
-                                className="w-full h-32 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                                placeholder="Enter laboratory findings..."
-                            />
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Select Result Outcome</label>
+                            <div className="relative">
+                                <select
+                                    value={resultText}
+                                    onChange={(e) => setResultText(e.target.value)}
+                                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-white text-slate-700"
+                                >
+                                    <option value="" disabled>-- Choose a standardised result --</option>
+                                    <option value="Normal - Within Reference Range">Normal - Within Reference Range</option>
+                                    <option value="Abnormal - OUT of Reference Range">Abnormal - OUT of Reference Range</option>
+                                    <option value="Positive / Detected">Positive / Detected</option>
+                                    <option value="Negative / Not Detected">Negative / Not Detected</option>
+                                    <option value="Critical High">Critical High - Immediate Attention</option>
+                                    <option value="Critical Low">Critical Low - Immediate Attention</option>
+                                    <option value="Inconclusive - Retest Recommended">Inconclusive - Retest Recommended</option>
+                                </select>
+                                <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-slate-500">
+                                    <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+                                </div>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-2">
+                                Please select the most appropriate outcome based on the lab analysis.
+                            </p>
                         </div>
 
                         <div className="flex gap-3 justify-end">

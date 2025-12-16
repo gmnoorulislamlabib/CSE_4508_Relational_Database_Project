@@ -54,11 +54,11 @@ INSERT INTO rooms (room_number, type, charge_per_day, is_available) VALUES
 
 -- Medical Tests (Moved after rooms to reference them)
 INSERT INTO medical_tests (test_name, description, cost, estimated_duration_minutes, assigned_room_number) VALUES
-('CBC (Complete Blood Count)', 'Evaluates overall health and detects a wide range of disorders.', 500.00, 15, 'Lab-001'),
-('Chest X-Ray', 'Produces images of the heart, lungs, airways, blood vessels and the bones of the spine and chest.', 800.00, 20, 'XRay-01'),
-('MRI Scan', 'Magnetic Resonance Imaging using strong magnetic fields.', 5000.00, 60, 'MRI-01'),
-('Lipid Profile', 'Measures cholesterol and other fats in blood.', 1200.00, 15, 'Lab-001'),
-('Urinalysis', 'Test of urine.', 300.00, 10, 'Lab-002');
+('CBC (Complete Blood Count)', 'Evaluates overall health and detects a wide range of disorders.', 500.00, 2, 'Lab-001'),
+('Chest X-Ray', 'Produces images of the heart, lungs, airways, blood vessels and the bones of the spine and chest.', 800.00, 3, 'XRay-01'),
+('MRI Scan', 'Magnetic Resonance Imaging using strong magnetic fields.', 5000.00, 5, 'MRI-01'),
+('Lipid Profile', 'Measures cholesterol and other fats in blood.', 1200.00, 2, 'Lab-001'),
+('Urinalysis', 'Test of urine.', 300.00, 1, 'Lab-002');
 
 -- Departments (Must be seeded before Specializations now)
 INSERT INTO departments (name, description, location) VALUES 
