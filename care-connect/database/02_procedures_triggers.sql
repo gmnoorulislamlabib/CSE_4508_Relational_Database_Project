@@ -331,30 +331,19 @@ END //
 CREATE PROCEDURE GetFinancialSummary()
 BEGIN
     SELECT 
-        COALESCE(
-            (SELECT COALESCE(SUM(amount), 0) FROM payments) + 
-            (SELECT COALESCE(SUM(net_amount), 0) FROM invoices WHERE status = 'Paid' AND test_record_id IS NOT NULL),
-            0
-        ) - (SELECT COALESCE(SUM(amount), 0) FROM hospital_expenses WHERE category = 'Pharmacy_Restock') as total_all_time,
+        (SELECT COALESCE(SUM(net_amount), 0) FROM invoices WHERE status = 'Paid') 
+        - (SELECT COALESCE(SUM(amount), 0) FROM hospital_expenses WHERE category = 'Pharmacy_Restock') as total_all_time,
         
-        COALESCE(
-            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payment_date >= DATE_SUB(NOW(), INTERVAL 1 YEAR)) +
-            (SELECT COALESCE(SUM(net_amount), 0) FROM invoices WHERE status = 'Paid' AND test_record_id IS NOT NULL AND generated_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)),
-            0
-        ) - (SELECT COALESCE(SUM(amount), 0) FROM hospital_expenses WHERE category = 'Pharmacy_Restock' AND expense_date >= DATE_SUB(NOW(), INTERVAL 1 YEAR)) as total_last_year,
+        (SELECT COALESCE(SUM(net_amount), 0) FROM invoices WHERE status = 'Paid' AND generated_at >= DATE_SUB(NOW(), INTERVAL 1 YEAR)) 
+        - (SELECT COALESCE(SUM(amount), 0) FROM hospital_expenses WHERE category = 'Pharmacy_Restock' AND expense_date >= DATE_SUB(NOW(), INTERVAL 1 YEAR)) as total_last_year,
         
-        COALESCE(
-            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payment_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) +
-            (SELECT COALESCE(SUM(net_amount), 0) FROM invoices WHERE status = 'Paid' AND test_record_id IS NOT NULL AND generated_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH)),
-            0
-        ) - (SELECT COALESCE(SUM(amount), 0) FROM hospital_expenses WHERE category = 'Pharmacy_Restock' AND expense_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) as total_last_month,
+        (SELECT COALESCE(SUM(net_amount), 0) FROM invoices WHERE status = 'Paid' AND generated_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) 
+        - (SELECT COALESCE(SUM(amount), 0) FROM hospital_expenses WHERE category = 'Pharmacy_Restock' AND expense_date >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) as total_last_month,
         
-        COALESCE(
-            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE payment_date >= DATE_SUB(NOW(), INTERVAL 1 WEEK)) +
-            (SELECT COALESCE(SUM(net_amount), 0) FROM invoices WHERE status = 'Paid' AND test_record_id IS NOT NULL AND generated_at >= DATE_SUB(NOW(), INTERVAL 1 WEEK)),
-            0
-        ) - (SELECT COALESCE(SUM(amount), 0) FROM hospital_expenses WHERE category = 'Pharmacy_Restock' AND expense_date >= DATE_SUB(NOW(), INTERVAL 1 WEEK)) as total_last_week;
+        (SELECT COALESCE(SUM(net_amount), 0) FROM invoices WHERE status = 'Paid' AND generated_at >= DATE_SUB(NOW(), INTERVAL 1 WEEK)) 
+        - (SELECT COALESCE(SUM(amount), 0) FROM hospital_expenses WHERE category = 'Pharmacy_Restock' AND expense_date >= DATE_SUB(NOW(), INTERVAL 1 WEEK)) as total_last_week;
 END //
+
 
 -- 4. Generate Full Invoice (Complex Logic)
 -- Aggregates Consultation Fee + Prescribed Medicines + Lab Tests
@@ -773,5 +762,35 @@ BEGIN
     -- IMPORTANT: Mark room as available again
     UPDATE rooms SET is_available = TRUE WHERE room_number = v_room;
 END //
+
+-- 23. Finalize Pharmacy Order on Invoice Payment
+DELIMITER //
+CREATE TRIGGER trg_finalize_pharmacy_order
+AFTER UPDATE ON invoices
+FOR EACH ROW
+BEGIN
+    IF NEW.status = 'Paid' AND OLD.status != 'Paid' AND NEW.pharmacy_order_id IS NOT NULL THEN
+        UPDATE pharmacy_orders 
+        SET status = 'Completed' 
+        WHERE order_id = NEW.pharmacy_order_id;
+    END IF;
+END //
 DELIMITER ;
+
+-- 24. Deduct Medicine Stock on Order Completion
+DELIMITER //
+CREATE TRIGGER trg_deduct_medicine_stock
+AFTER UPDATE ON pharmacy_orders
+FOR EACH ROW
+BEGIN
+    IF NEW.status = 'Completed' AND OLD.status != 'Completed' THEN
+        -- Reduce stock for each item in the order
+        UPDATE medicines m
+        JOIN pharmacy_order_items poi ON m.medicine_id = poi.medicine_id
+        SET m.stock_quantity = m.stock_quantity - poi.quantity
+        WHERE poi.order_id = NEW.order_id;
+    END IF;
+END //
+DELIMITER ;
+
 

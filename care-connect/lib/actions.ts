@@ -848,6 +848,18 @@ export async function restockMedicine(formData: FormData) {
 }
 
 export async function createPharmacySale(patientId: number, items: { medicineId: number, quantity: number, price: number }[]) {
+    // 0. Server-side Role Check
+    const cookieStore = await cookies();
+    const session = cookieStore.get('session');
+    if (session) {
+        try {
+            const role = JSON.parse(session.value).role;
+            if (role === 'Admin') {
+                return { success: false, error: 'Admins cannot perform sales.' };
+            }
+        } catch (e) { }
+    }
+
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
@@ -962,15 +974,18 @@ export async function getAllPatients(query: string = '') {
 export async function getRevenueReport(startDate: string, endDate: string) {
     const connection = await pool.getConnection();
     try {
+        const startDateTime = `${startDate} 00:00:00`;
+        const endDateTime = `${endDate} 23:59:59`;
+
         const [totalRes] = await connection.query(
             `CALL GetTotalEarnings(?, ?)`,
-            [startDate, endDate]
+            [startDateTime, endDateTime]
         );
         const totalEarnings = (totalRes as any)[0][0].total_earnings;
 
         const [deptRes] = await connection.query(
             `CALL GetDepartmentEarnings(?, ?)`,
-            [startDate, endDate]
+            [startDateTime, endDateTime]
         );
         const departmentData = (deptRes as any)[0];
 

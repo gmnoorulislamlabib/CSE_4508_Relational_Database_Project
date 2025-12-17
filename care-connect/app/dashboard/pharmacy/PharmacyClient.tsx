@@ -5,7 +5,7 @@ import { Pill, AlertTriangle, PlusCircle, Package, ShoppingCart } from 'lucide-r
 import { restockMedicine } from '@/lib/actions';
 import SellMedicineModal from './SellMedicineModal';
 
-export default function PharmacyClient({ medicines, patients }: { medicines: any[], patients: any[] }) {
+export default function PharmacyClient({ medicines, patients, role }: { medicines: any[], patients: any[], role: string | null }) {
     const [selectedMed, setSelectedMed] = useState<any>(null);
     const [isRestocking, setIsRestocking] = useState(false);
     const [isSaleOpen, setIsSaleOpen] = useState(false);
@@ -20,12 +20,14 @@ export default function PharmacyClient({ medicines, patients }: { medicines: any
                     </h1>
                     <p className="text-slate-500">Monitor stock levels and manage restocking.</p>
                 </div>
-                <button
-                    onClick={() => setIsSaleOpen(true)}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20 font-medium"
-                >
-                    <ShoppingCart size={18} /> New Sale
-                </button>
+                {role !== 'Admin' && (
+                    <button
+                        onClick={() => setIsSaleOpen(true)}
+                        className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20 font-medium"
+                    >
+                        <ShoppingCart size={18} /> New Sale
+                    </button>
+                )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

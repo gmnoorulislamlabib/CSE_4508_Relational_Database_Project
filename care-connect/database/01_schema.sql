@@ -297,3 +297,51 @@ CREATE TABLE admissions (
 -- Note: Invoices table FK for admission will be handled via link or generic
 ALTER TABLE invoices ADD COLUMN admission_id INT NULL;
 ALTER TABLE invoices ADD CONSTRAINT fk_invoices_admission FOREIGN KEY (admission_id) REFERENCES admissions(admission_id) ON DELETE CASCADE;
+
+-- 22. Pharmacy Orders Table
+CREATE TABLE IF NOT EXISTS pharmacy_orders (
+    order_id INT AUTO_INCREMENT PRIMARY KEY,
+    patient_id INT NOT NULL,
+    total_amount DECIMAL(10, 2) NOT NULL,
+    status ENUM('Pending_Payment', 'Completed', 'Cancelled') DEFAULT 'Pending_Payment',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (patient_id) REFERENCES patients(patient_id)
+);
+
+-- 23. Pharmacy Order Items Table
+CREATE TABLE IF NOT EXISTS pharmacy_order_items (
+    item_id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    medicine_id INT NOT NULL,
+    quantity INT NOT NULL,
+    unit_price DECIMAL(10, 2) NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES pharmacy_orders(order_id) ON DELETE CASCADE,
+    FOREIGN KEY (medicine_id) REFERENCES medicines(medicine_id)
+);
+
+-- Link Invoice to Pharmacy Order
+ALTER TABLE invoices ADD COLUMN pharmacy_order_id INT NULL;
+ALTER TABLE invoices ADD CONSTRAINT fk_invoices_pharmacy_order FOREIGN KEY (pharmacy_order_id) REFERENCES pharmacy_orders(order_id);
+
+-- 24. Hospital Expenses Table (For Net Revenue Calculation)
+CREATE TABLE IF NOT EXISTS hospital_expenses (
+    expense_id INT AUTO_INCREMENT PRIMARY KEY,
+    category VARCHAR(50) NOT NULL, -- e.g. 'Pharmacy_Restock', 'Maintenance', 'Salaries'
+    amount DECIMAL(10, 2) NOT NULL,
+    description TEXT,
+    expense_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    performed_by INT -- User ID of admin who recorded it
+);
+
+-- 25. Financial Reports (Pre-calculated View Table)
+CREATE TABLE IF NOT EXISTS financial_reports (
+    report_id INT AUTO_INCREMENT PRIMARY KEY,
+    report_type ENUM('Yearly', 'Monthly', 'Weekly') NOT NULL,
+    period_label VARCHAR(50) NOT NULL, -- '2025', '2025-01', '2025-W01'
+    total_revenue DECIMAL(15, 2) DEFAULT 0.00,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_report (report_type, period_label)
+);
+
+
+
