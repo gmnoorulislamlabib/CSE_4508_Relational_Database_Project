@@ -59,6 +59,46 @@ async function seed() {
         await connection.query(seedSql);
         console.log('✅ Seed Data inserted.');
 
+        // 4.2 Post-Seed Triggers
+        console.log('⏳ Applying Post-Seed Triggers...');
+        const postSeedSql = fs.readFileSync(path.join(__dirname, '../database/05_post_seed_triggers.sql'), 'utf8');
+        const postSeedBlocks = postSeedSql
+            .replace(/DELIMITER \/\//g, '')
+            .replace(/DELIMITER ;/g, '')
+            .split('//')
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+
+        for (const block of postSeedBlocks) {
+            if (block.toLowerCase().startsWith('use')) continue;
+            try {
+                await connection.query(block);
+            } catch (e) {
+                console.error('Error executing post-seed block:', e.message);
+            }
+        }
+        console.log('✅ Post-Seed Triggers created.');
+
+        // 4.5 Analytics
+        console.log('⏳ Applying Analytics Procedures...');
+        const analyticsSql = fs.readFileSync(path.join(__dirname, '../database/07_analytics.sql'), 'utf8');
+        const analyticsBlocks = analyticsSql
+            .replace(/DELIMITER \/\//g, '')
+            .replace(/DELIMITER ;/g, '')
+            .split('//')
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+
+        for (const block of analyticsBlocks) {
+            if (block.toLowerCase().startsWith('use')) continue;
+            try {
+                await connection.query(block);
+            } catch (e) {
+                console.error('Error executing analytics block:', e.message);
+            }
+        }
+        console.log('✅ Analytics Procedures created.');
+
         // 5. Advanced Features (Splitting logic needed for DELIMITER)
         console.log('⏳ Applying Advanced Features (Partitioning, Events, Cursors)...');
         const advSqlFile = fs.readFileSync(path.join(__dirname, '../database/06_advanced_features.sql'), 'utf8');

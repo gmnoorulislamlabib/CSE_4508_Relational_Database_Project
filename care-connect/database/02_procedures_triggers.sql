@@ -593,25 +593,9 @@ BEGIN
 END //
 DELIMITER ;
 
--- 17. Auto-Generate Invoice for Paid Tests
-DELIMITER //
-CREATE TRIGGER trg_create_test_invoice
-AFTER INSERT ON patient_tests
-FOR EACH ROW
-BEGIN
-    DECLARE test_cost DECIMAL(10, 2);
-    
-    -- Only create invoice if payment is PAID
-    IF NEW.payment_status = 'PAID' THEN
-        -- Get test cost
-        SELECT cost INTO test_cost FROM medical_tests WHERE test_id = NEW.test_id;
-        
-        -- Create invoice
-        INSERT INTO invoices (test_record_id, total_amount, discount_amount, net_amount, status, generated_at)
-        VALUES (NEW.record_id, test_cost, 0.00, test_cost, 'Paid', NOW());
-    END IF;
-END //
-DELIMITER ;
+-- 17. Auto-Generate Invoice for Paid Tests (Moved to post-seed)
+-- Trigger `trg_create_test_invoice` is now applied after seeding to allow manual invoice creation for history.
+
 
 
 -- 19. Auto-Update Test History Summary on Test Completion

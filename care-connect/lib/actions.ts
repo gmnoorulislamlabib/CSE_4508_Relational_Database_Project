@@ -831,7 +831,7 @@ export async function restockMedicine(formData: FormData) {
 
         // 2. Log Expense
         await connection.execute(
-            `INSERT INTO hospital_expenses (category, description, amount, recorded_by) 
+            `INSERT INTO hospital_expenses (category, description, amount, performed_by) 
              VALUES ('Pharmacy_Restock', CONCAT('Restock Item #', ?), ?, NULL)`,
             [medicineId, totalCost]
         );

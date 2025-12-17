@@ -38,8 +38,20 @@ BEGIN
         WHERE i.pharmacy_order_id IS NOT NULL 
         AND i.status = 'Paid'
         AND i.generated_at BETWEEN p_start_date AND p_end_date
+
+        UNION ALL
+
+        -- 4. Pharmacy Expenses (Deducted)
+        SELECT 
+            'Pharmacy' as department_name,
+            -(e.amount) as revenue
+        FROM hospital_expenses e
+        WHERE e.category = 'Pharmacy_Restock'
+        AND e.expense_date BETWEEN p_start_date AND p_end_date
+
     ) as combined_data
     GROUP BY department_name
     ORDER BY total_revenue DESC;
 END //
+
 DELIMITER ;

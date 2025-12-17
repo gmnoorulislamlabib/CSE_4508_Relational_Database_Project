@@ -4,11 +4,13 @@ import { useState } from 'react';
 import { Pill, AlertTriangle, PlusCircle, Package, ShoppingCart } from 'lucide-react';
 import { restockMedicine } from '@/lib/actions';
 import SellMedicineModal from './SellMedicineModal';
+import { useRouter } from 'next/navigation';
 
 export default function PharmacyClient({ medicines, patients, role }: { medicines: any[], patients: any[], role: string | null }) {
     const [selectedMed, setSelectedMed] = useState<any>(null);
     const [isRestocking, setIsRestocking] = useState(false);
     const [isSaleOpen, setIsSaleOpen] = useState(false);
+    const router = useRouter();
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -82,7 +84,14 @@ export default function PharmacyClient({ medicines, patients, role }: { medicine
 
                             <form action={async (formData) => {
                                 setIsRestocking(true);
-                                await restockMedicine(formData);
+                                const res = await restockMedicine(formData);
+                                if (!res.success) {
+                                    alert(res.error || "Failed to restock");
+                                    setIsRestocking(false);
+                                    return;
+                                }
+                                await new Promise(resolve => setTimeout(resolve, 500));
+                                router.refresh();
                                 setIsRestocking(false);
                                 setSelectedMed(null);
                             }}>

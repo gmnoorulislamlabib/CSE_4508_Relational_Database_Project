@@ -511,8 +511,10 @@ INSERT INTO invoices (invoice_id, test_record_id, total_amount, net_amount, stat
 -- =========================================================
 -- PAYMENTS (Matches Invoices)
 -- =========================================================
-INSERT INTO payments (invoice_id, amount, payment_method, payment_date)
-SELECT invoice_id, net_amount, 'Cash', generated_at FROM invoices WHERE invoice_id >= 200;
+-- Using Temp Table to avoid 'Can't update table in trigger' error (Trigger updates Invoices, while Select reads Invoices)
+CREATE TEMPORARY TABLE temp_payments_seed AS SELECT invoice_id, net_amount, generated_at FROM invoices WHERE invoice_id >= 200;
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) SELECT invoice_id, net_amount, 'Cash', generated_at FROM temp_payments_seed;
+DROP TEMPORARY TABLE temp_payments_seed;
 
 -- =========================================================
 -- GUARANTEED ACTIVITY SEED (ENSURES EVERYONE HAS DATA)

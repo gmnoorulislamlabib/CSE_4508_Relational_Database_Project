@@ -87,7 +87,7 @@ export default function RevenueReporter() {
                             </h4>
                         </div>
                         <div className="h-12 w-12 bg-green-200 rounded-full flex items-center justify-center text-green-700">
-                            <DollarSign size={24} />
+                            <span className="text-2xl font-bold">৳</span>
                         </div>
                     </div>
 
