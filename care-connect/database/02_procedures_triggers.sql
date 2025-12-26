@@ -593,25 +593,9 @@ BEGIN
 END //
 DELIMITER ;
 
--- 17. Auto-Generate Invoice for Paid Tests
-DELIMITER //
-CREATE TRIGGER trg_create_test_invoice
-AFTER INSERT ON patient_tests
-FOR EACH ROW
-BEGIN
-    DECLARE test_cost DECIMAL(10, 2);
-    
-    -- Only create invoice if payment is PAID
-    IF NEW.payment_status = 'PAID' THEN
-        -- Get test cost
-        SELECT cost INTO test_cost FROM medical_tests WHERE test_id = NEW.test_id;
-        
-        -- Create invoice
-        INSERT INTO invoices (test_record_id, total_amount, discount_amount, net_amount, status, generated_at)
-        VALUES (NEW.record_id, test_cost, 0.00, test_cost, 'Paid', NOW());
-    END IF;
-END //
-DELIMITER ;
+-- 17. Auto-Generate Invoice for Paid Tests (Moved to post-seed)
+-- Trigger `trg_create_test_invoice` is now applied after seeding to allow manual invoice creation for history.
+
 
 
 -- 19. Auto-Update Test History Summary on Test Completion
@@ -789,6 +773,477 @@ BEGIN
         JOIN pharmacy_order_items poi ON m.medicine_id = poi.medicine_id
         SET m.stock_quantity = m.stock_quantity - poi.quantity
         WHERE poi.order_id = NEW.order_id;
+    END IF;
+END //
+DELIMITER ;
+
+-- =============================================
+-- ADDITIONAL PROCEDURES & TRIGGERS
+-- =============================================
+
+-- 25. Get Equipment Maintenance Schedule
+DELIMITER //
+CREATE PROCEDURE GetEquipmentMaintenanceSchedule(
+    IN p_start_date DATE,
+    IN p_end_date DATE
+)
+BEGIN
+    SELECT 
+        ei.equipment_id,
+        ei.equipment_name,
+        ei.equipment_type,
+        ei.assigned_room,
+        ei.current_status,
+        eml.next_maintenance_date,
+        eml.maintenance_type,
+        d.name AS department_name
+    FROM equipment_inventory ei
+    LEFT JOIN equipment_maintenance_log eml ON ei.equipment_id = eml.equipment_id
+    LEFT JOIN departments d ON ei.assigned_dept_id = d.dept_id
+    WHERE eml.next_maintenance_date BETWEEN p_start_date AND p_end_date
+    ORDER BY eml.next_maintenance_date ASC;
+END //
+DELIMITER ;
+
+-- 26. Log Equipment Maintenance
+DELIMITER //
+CREATE PROCEDURE LogEquipmentMaintenance(
+    IN p_equipment_id INT,
+    IN p_maintenance_type ENUM('Routine', 'Repair', 'Calibration', 'Emergency'),
+    IN p_performed_by VARCHAR(100),
+    IN p_cost DECIMAL(10,2),
+    IN p_description TEXT,
+    IN p_next_maintenance_days INT
+)
+BEGIN
+    DECLARE v_next_date DATE;
+    
+    SET v_next_date = DATE_ADD(CURDATE(), INTERVAL p_next_maintenance_days DAY);
+    
+    INSERT INTO equipment_maintenance_log (
+        equipment_id, maintenance_type, maintenance_date, 
+        performed_by, cost, description, next_maintenance_date
+    ) VALUES (
+        p_equipment_id, p_maintenance_type, NOW(),
+        p_performed_by, p_cost, p_description, v_next_date
+    );
+    
+    UPDATE equipment_inventory 
+    SET current_status = 'Operational'
+    WHERE equipment_id = p_equipment_id;
+END //
+DELIMITER ;
+
+-- 27. Record Staff Attendance
+DELIMITER //
+CREATE PROCEDURE RecordStaffCheckIn(
+    IN p_user_id INT
+)
+BEGIN
+    DECLARE v_today DATE;
+    DECLARE v_existing INT;
+    
+    SET v_today = CURDATE();
+    
+    SELECT COUNT(*) INTO v_existing 
+    FROM staff_attendance 
+    WHERE user_id = p_user_id AND attendance_date = v_today;
+    
+    IF v_existing = 0 THEN
+        INSERT INTO staff_attendance (user_id, check_in_time, attendance_date, status)
+        VALUES (p_user_id, NOW(), v_today, 'Present');
+    END IF;
+END //
+DELIMITER ;
+
+-- 28. Record Staff Checkout
+DELIMITER //
+CREATE PROCEDURE RecordStaffCheckOut(
+    IN p_user_id INT
+)
+BEGIN
+    UPDATE staff_attendance 
+    SET check_out_time = NOW()
+    WHERE user_id = p_user_id 
+      AND attendance_date = CURDATE()
+      AND check_out_time IS NULL;
+END //
+DELIMITER ;
+
+-- 29. Submit Leave Request
+DELIMITER //
+CREATE PROCEDURE SubmitLeaveRequest(
+    IN p_user_id INT,
+    IN p_leave_type ENUM('Sick', 'Casual', 'Earned', 'Maternity', 'Paternity', 'Emergency'),
+    IN p_start_date DATE,
+    IN p_end_date DATE,
+    IN p_reason TEXT,
+    OUT p_request_id INT
+)
+BEGIN
+    INSERT INTO leave_requests (user_id, leave_type, start_date, end_date, reason, status)
+    VALUES (p_user_id, p_leave_type, p_start_date, p_end_date, p_reason, 'Pending');
+    
+    SET p_request_id = LAST_INSERT_ID();
+END //
+DELIMITER ;
+
+-- 30. Approve/Reject Leave Request
+DELIMITER //
+CREATE PROCEDURE ProcessLeaveRequest(
+    IN p_leave_id INT,
+    IN p_approver_id INT,
+    IN p_new_status ENUM('Approved', 'Rejected')
+)
+BEGIN
+    UPDATE leave_requests 
+    SET status = p_new_status,
+        approved_by = p_approver_id
+    WHERE leave_id = p_leave_id AND status = 'Pending';
+END //
+DELIMITER ;
+
+-- 31. Add Patient Feedback
+DELIMITER //
+CREATE PROCEDURE AddPatientFeedback(
+    IN p_patient_id INT,
+    IN p_appointment_id INT,
+    IN p_rating INT,
+    IN p_category ENUM('Doctor', 'Service', 'Facility', 'Billing', 'Staff', 'General'),
+    IN p_comments TEXT,
+    IN p_is_anonymous BOOLEAN
+)
+BEGIN
+    IF p_rating BETWEEN 1 AND 5 THEN
+        INSERT INTO patient_feedback (
+            patient_id, appointment_id, rating, feedback_category, 
+            comments, is_anonymous
+        ) VALUES (
+            p_patient_id, p_appointment_id, p_rating, p_category,
+            p_comments, p_is_anonymous
+        );
+    END IF;
+END //
+DELIMITER ;
+
+-- 32. Create Hospital Announcement
+DELIMITER //
+CREATE PROCEDURE CreateAnnouncement(
+    IN p_title VARCHAR(200),
+    IN p_content TEXT,
+    IN p_target_audience ENUM('All', 'Doctors', 'Patients', 'Staff', 'Admin'),
+    IN p_priority ENUM('Low', 'Medium', 'High', 'Urgent'),
+    IN p_created_by INT,
+    IN p_expiry_days INT
+)
+BEGIN
+    DECLARE v_expiry_date DATETIME;
+    
+    IF p_expiry_days > 0 THEN
+        SET v_expiry_date = DATE_ADD(NOW(), INTERVAL p_expiry_days DAY);
+    ELSE
+        SET v_expiry_date = NULL;
+    END IF;
+    
+    INSERT INTO announcements (
+        title, content, target_audience, priority, 
+        created_by, expiry_date
+    ) VALUES (
+        p_title, p_content, p_target_audience, p_priority,
+        p_created_by, v_expiry_date
+    );
+END //
+DELIMITER ;
+
+-- 33. Track Medical Supply Usage
+DELIMITER //
+CREATE PROCEDURE RecordSupplyUsage(
+    IN p_supply_id INT,
+    IN p_quantity INT,
+    IN p_dept_id INT,
+    IN p_patient_id INT,
+    IN p_recorded_by INT,
+    IN p_remarks TEXT
+)
+BEGIN
+    INSERT INTO supply_usage_log (
+        supply_id, quantity_used, used_by_dept_id, 
+        used_for_patient_id, recorded_by, remarks
+    ) VALUES (
+        p_supply_id, p_quantity, p_dept_id,
+        p_patient_id, p_recorded_by, p_remarks
+    );
+    
+    UPDATE medical_supplies 
+    SET current_stock = current_stock - p_quantity
+    WHERE supply_id = p_supply_id;
+END //
+DELIMITER ;
+
+-- 34. Check Blood Availability
+DELIMITER //
+CREATE FUNCTION CheckBloodAvailability(
+    p_blood_type VARCHAR(5),
+    p_rh_factor ENUM('Positive', 'Negative')
+)
+RETURNS INT
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE available_units INT;
+    
+    SELECT COALESCE(SUM(units_available), 0) INTO available_units
+    FROM blood_bank
+    WHERE blood_type = p_blood_type
+      AND rh_factor = p_rh_factor
+      AND status = 'Available'
+      AND expiry_date > CURDATE();
+    
+    RETURN available_units;
+END //
+DELIMITER ;
+
+-- 35. Record Blood Transfusion
+DELIMITER //
+CREATE PROCEDURE RecordBloodTransfusion(
+    IN p_patient_id INT,
+    IN p_blood_id INT,
+    IN p_doctor_id INT,
+    IN p_units_transfused DECIMAL(5,2),
+    IN p_reaction_observed BOOLEAN,
+    IN p_reaction_notes TEXT
+)
+BEGIN
+    INSERT INTO blood_transfusions (
+        patient_id, blood_id, doctor_id, transfusion_date,
+        units_transfused, reaction_observed, reaction_notes
+    ) VALUES (
+        p_patient_id, p_blood_id, p_doctor_id, NOW(),
+        p_units_transfused, p_reaction_observed, p_reaction_notes
+    );
+    
+    UPDATE blood_bank 
+    SET units_available = units_available - p_units_transfused,
+        status = IF(units_available - p_units_transfused <= 0, 'Used', 'Available')
+    WHERE blood_id = p_blood_id;
+END //
+DELIMITER ;
+
+-- 36. Schedule Ambulance Service
+DELIMITER //
+CREATE PROCEDURE ScheduleAmbulanceService(
+    IN p_ambulance_id INT,
+    IN p_patient_id INT,
+    IN p_pickup_location TEXT,
+    IN p_dropoff_location TEXT,
+    IN p_emergency_type VARCHAR(100),
+    OUT p_service_id INT
+)
+BEGIN
+    DECLARE v_available INT;
+    
+    SELECT COUNT(*) INTO v_available
+    FROM ambulance_fleet
+    WHERE ambulance_id = p_ambulance_id
+      AND current_status = 'Available';
+    
+    IF v_available > 0 THEN
+        INSERT INTO ambulance_service_logs (
+            ambulance_id, patient_id, pickup_location, 
+            dropoff_location, service_date, emergency_type
+        ) VALUES (
+            p_ambulance_id, p_patient_id, p_pickup_location,
+            p_dropoff_location, NOW(), p_emergency_type
+        );
+        
+        SET p_service_id = LAST_INSERT_ID();
+        
+        UPDATE ambulance_fleet 
+        SET current_status = 'On_Duty'
+        WHERE ambulance_id = p_ambulance_id;
+    ELSE
+        SET p_service_id = NULL;
+    END IF;
+END //
+DELIMITER ;
+
+-- 37. Complete Ambulance Service
+DELIMITER //
+CREATE PROCEDURE CompleteAmbulanceService(
+    IN p_service_id INT,
+    IN p_distance_km DECIMAL(8,2),
+    IN p_charge_amount DECIMAL(10,2)
+)
+BEGIN
+    DECLARE v_ambulance_id INT;
+    
+    SELECT ambulance_id INTO v_ambulance_id
+    FROM ambulance_service_logs
+    WHERE service_id = p_service_id;
+    
+    UPDATE ambulance_service_logs 
+    SET completion_time = NOW(),
+        distance_km = p_distance_km,
+        charge_amount = p_charge_amount
+    WHERE service_id = p_service_id;
+    
+    UPDATE ambulance_fleet 
+    SET current_status = 'Available'
+    WHERE ambulance_id = v_ambulance_id;
+END //
+DELIMITER ;
+
+-- 38. Add Vaccination Record
+DELIMITER //
+CREATE PROCEDURE AddVaccinationRecord(
+    IN p_patient_id INT,
+    IN p_vaccine_name VARCHAR(100),
+    IN p_dose_number INT,
+    IN p_administered_by INT,
+    IN p_batch_number VARCHAR(50),
+    IN p_manufacturer VARCHAR(100),
+    IN p_next_dose_days INT
+)
+BEGIN
+    DECLARE v_next_dose DATE;
+    
+    IF p_next_dose_days > 0 THEN
+        SET v_next_dose = DATE_ADD(CURDATE(), INTERVAL p_next_dose_days DAY);
+    ELSE
+        SET v_next_dose = NULL;
+    END IF;
+    
+    INSERT INTO vaccination_records (
+        patient_id, vaccine_name, dose_number, vaccination_date,
+        administered_by, batch_number, manufacturer, next_dose_date
+    ) VALUES (
+        p_patient_id, p_vaccine_name, p_dose_number, CURDATE(),
+        p_administered_by, p_batch_number, p_manufacturer, v_next_dose
+    );
+END //
+DELIMITER ;
+
+-- 39. Get Staff Attendance Report
+DELIMITER //
+CREATE PROCEDURE GetStaffAttendanceReport(
+    IN p_start_date DATE,
+    IN p_end_date DATE,
+    IN p_user_id INT
+)
+BEGIN
+    SELECT 
+        sa.attendance_date,
+        sa.check_in_time,
+        sa.check_out_time,
+        sa.status,
+        TIMESTAMPDIFF(HOUR, sa.check_in_time, sa.check_out_time) AS hours_worked,
+        u.email,
+        CONCAT(p.first_name, ' ', p.last_name) AS full_name
+    FROM staff_attendance sa
+    JOIN users u ON sa.user_id = u.user_id
+    JOIN profiles p ON u.user_id = p.user_id
+    WHERE sa.user_id = p_user_id
+      AND sa.attendance_date BETWEEN p_start_date AND p_end_date
+    ORDER BY sa.attendance_date DESC;
+END //
+DELIMITER ;
+
+-- 40. Calculate Average Patient Satisfaction
+DELIMITER //
+CREATE FUNCTION CalculateAverageSatisfaction(
+    p_category ENUM('Doctor', 'Service', 'Facility', 'Billing', 'Staff', 'General')
+)
+RETURNS DECIMAL(3,2)
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE avg_rating DECIMAL(3,2);
+    
+    SELECT AVG(rating) INTO avg_rating
+    FROM patient_feedback
+    WHERE feedback_category = p_category;
+    
+    RETURN IFNULL(avg_rating, 0);
+END //
+DELIMITER ;
+
+-- =============================================
+-- ADDITIONAL TRIGGERS
+-- =============================================
+
+-- 41. Auto-expire Blood Units
+DELIMITER //
+CREATE TRIGGER trg_expire_blood_units
+BEFORE UPDATE ON blood_bank
+FOR EACH ROW
+BEGIN
+    IF NEW.expiry_date <= CURDATE() AND OLD.status != 'Expired' THEN
+        SET NEW.status = 'Expired';
+        SET NEW.units_available = 0;
+    END IF;
+END //
+DELIMITER ;
+
+-- 42. Auto-mark Equipment Maintenance Status
+DELIMITER //
+CREATE TRIGGER trg_equipment_maintenance_alert
+AFTER INSERT ON equipment_maintenance_log
+FOR EACH ROW
+BEGIN
+    UPDATE equipment_inventory
+    SET current_status = 'Under_Maintenance'
+    WHERE equipment_id = NEW.equipment_id;
+END //
+DELIMITER ;
+
+-- 43. Validate Medical Supply Reorder Level
+DELIMITER //
+CREATE TRIGGER trg_supply_reorder_alert
+AFTER UPDATE ON medical_supplies
+FOR EACH ROW
+BEGIN
+    IF NEW.current_stock <= NEW.reorder_level AND OLD.current_stock > OLD.reorder_level THEN
+        INSERT INTO announcements (title, content, target_audience, priority, created_by)
+        VALUES (
+            CONCAT('Low Stock Alert: ', NEW.supply_name),
+            CONCAT('Supply ', NEW.supply_name, ' is running low. Current stock: ', NEW.current_stock),
+            'Staff',
+            'High',
+            1
+        );
+    END IF;
+END //
+DELIMITER ;
+
+-- 44. Auto-deactivate Expired Announcements
+DELIMITER //
+CREATE TRIGGER trg_expire_announcements
+BEFORE UPDATE ON announcements
+FOR EACH ROW
+BEGIN
+    IF NEW.expiry_date IS NOT NULL AND NEW.expiry_date <= NOW() THEN
+        SET NEW.is_active = FALSE;
+    END IF;
+END //
+DELIMITER ;
+
+-- 45. Validate Staff Certification Expiry
+DELIMITER //
+CREATE TRIGGER trg_certification_expiry_alert
+AFTER UPDATE ON staff_certifications
+FOR EACH ROW
+BEGIN
+    IF NEW.expiry_date IS NOT NULL 
+       AND DATEDIFF(NEW.expiry_date, CURDATE()) <= 30 
+       AND DATEDIFF(NEW.expiry_date, CURDATE()) > 0 THEN
+        INSERT INTO announcements (title, content, target_audience, priority, created_by)
+        VALUES (
+            'Certification Expiring Soon',
+            CONCAT('Certification ', NEW.certification_name, ' expires on ', NEW.expiry_date),
+            'Staff',
+            'Medium',
+            1
+        );
     END IF;
 END //
 DELIMITER ;
