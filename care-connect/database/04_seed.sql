@@ -10,7 +10,6 @@ INSERT INTO users (email, password_hash, role) VALUES
 ('dr.nasreen@careconnect.bd', 'doctor123', 'Doctor'),
 ('rahim.mia@careconnect.bd', 'patient123', 'Patient'),
 ('fatema.begum@careconnect.bd', 'patient123', 'Patient');
-('reception@careconnect.bd', 'reception123', 'Staff');
 
 -- Profiles
 INSERT INTO profiles (user_id, first_name, last_name, phone_number, gender, date_of_birth, address) VALUES
@@ -498,22 +497,24 @@ INSERT INTO invoices (invoice_id, test_record_id, total_amount, net_amount, stat
 
 -- Patient 4 (Kamal) - Lipid Profile
 INSERT INTO patient_tests (patient_id, test_id, record_id, doctor_id, payment_status, status) VALUES (4, 3, 601, 1, 'PAID', 'COMPLETED');
-INSERT INTO invoices (invoice_id, test_record_id, total_amount, net_amount, status, generated_at) VALUES (610, 601, 1500.00, 1500.00, 'Paid', DATE_SUB(NOW(), INTERVAL 1 MONTH));
+INSERT INTO invoices (invoice_id, test_record_id, total_amount, net_amount, status, generated_at) VALUES (601, 601, 1500.00, 1500.00, 'Paid', DATE_SUB(NOW(), INTERVAL 1 MONTH));
 
 -- Patient 6 (James) - Dengue
 INSERT INTO patient_tests (patient_id, test_id, record_id, doctor_id, payment_status, status) VALUES (6, 4, 602, 6, 'PAID', 'COMPLETED');
-INSERT INTO invoices (invoice_id, test_record_id, total_amount, net_amount, status, generated_at) VALUES (611, 602, 1200.00, 1200.00, 'Paid', DATE_SUB(NOW(), INTERVAL 3 WEEK));
+INSERT INTO invoices (invoice_id, test_record_id, total_amount, net_amount, status, generated_at) VALUES (602, 602, 1200.00, 1200.00, 'Paid', DATE_SUB(NOW(), INTERVAL 3 WEEK));
 
 -- Patient 7 (Anisul) - CBC
 INSERT INTO patient_tests (patient_id, test_id, record_id, doctor_id, payment_status, status) VALUES (7, 1, 603, 3, 'PAID', 'COMPLETED');
-INSERT INTO invoices (invoice_id, test_record_id, total_amount, net_amount, status, generated_at) VALUES (612, 603, 600.00, 600.00, 'Paid', DATE_SUB(NOW(), INTERVAL 1 DAY));
+INSERT INTO invoices (invoice_id, test_record_id, total_amount, net_amount, status, generated_at) VALUES (603, 603, 600.00, 600.00, 'Paid', DATE_SUB(NOW(), INTERVAL 1 DAY));
 
 
 -- =========================================================
 -- PAYMENTS (Matches Invoices)
 -- =========================================================
-INSERT INTO payments (invoice_id, amount, payment_method, payment_date)
-SELECT invoice_id, net_amount, 'Cash', generated_at FROM invoices WHERE invoice_id >= 200;
+-- Using Temp Table to avoid 'Can't update table in trigger' error (Trigger updates Invoices, while Select reads Invoices)
+CREATE TEMPORARY TABLE temp_payments_seed AS SELECT invoice_id, net_amount, generated_at FROM invoices WHERE invoice_id >= 200;
+INSERT INTO payments (invoice_id, amount, payment_method, payment_date) SELECT invoice_id, net_amount, 'Cash', generated_at FROM temp_payments_seed;
+DROP TEMPORARY TABLE temp_payments_seed;
 
 -- =========================================================
 -- GUARANTEED ACTIVITY SEED (ENSURES EVERYONE HAS DATA)
@@ -582,7 +583,4 @@ INSERT INTO invoices (invoice_id, test_record_id, total_amount, net_amount, stat
 INSERT INTO payments (invoice_id, amount, payment_method, payment_date) VALUES
 (700, 600.00, 'Cash', DATE_SUB(NOW(), INTERVAL 1 DAY)),
 (701, 800.00, 'Card', DATE_SUB(NOW(), INTERVAL 2 DAY)),
-(702, 1200.00, 'Online', DATE_SUB(NOW(), INTERVAL 3 DAY)),
-(610, 1500.00, 'Cash', DATE_SUB(NOW(), INTERVAL 1 MONTH)),
-(611, 1200.00, 'Card', DATE_SUB(NOW(), INTERVAL 3 WEEK)),
-(612, 600.00, 'Online', DATE_SUB(NOW(), INTERVAL 1 DAY));
+(702, 1200.00, 'Online', DATE_SUB(NOW(), INTERVAL 3 DAY));
